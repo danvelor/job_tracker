@@ -1,0 +1,62 @@
+# ---------- macOS ----------
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ---------- Node / Next.js ----------
+node_modules/
+.pnp
+.pnp.js
+.next/
+out/
+build/
+dist/
+coverage/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+
+# Test artifacts
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# ---------- Env ----------
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ---------- .NET ----------
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+project.lock.json
+artifacts/
+TestResults/
+*.coverage
+*.coverapp
+BenchmarkDotNet.Artifacts/
+
+# ---------- IDE ----------
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+
+# ---------- Logs ----------
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
