@@ -93,7 +93,8 @@ than one that is merely described.
 ┌──────────────────────────────────┴───────────────────────────────────────────┐
 │ POSTGRESQL 17 — one database, one connection, schema per module              │
 │                                                                              │
-│  schema jobs        jobs, job_photos, notifications, outbox_messages         │
+│  schema jobs        jobs, job_photos, assignees, customers,                  │
+│                     notifications, outbox_messages                           │
 │                     (notifications unique on source_event_id + recipient)    │
 │  schema billing     invoices  (unique on job_id + job_completed_at)          │
 │  schema hangfire    Hangfire's own tables                                    │

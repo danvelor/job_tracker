@@ -300,7 +300,7 @@ executable against the domain rules the same document specifies.
 | Real email or SMS delivery to live recipients | Delivery is simulated: each notification is recorded with a status, and reaching `Sent` is the proof. Delivering to real addresses requires an account and adds nothing to what is being demonstrated |
 | Crew-facing mobile application | The crew is a notification recipient in this scope. Photos and signature are captured by office staff |
 | Customer portal | Customers receive notifications; they do not log in |
-| Customer and crew administration | Customers and assignees are referenced by identifier. Managing them belongs to areas of the business outside this system |
+| Customer and crew **administration** | The system holds a roster of both so that a job can name who it is for and who is doing it, but creating, editing and deactivating them belongs to areas of the business outside this workflow. The roster is fixed at installation |
 | Weather, routing, inventory, payroll | Adjacent roofing concerns, none of which the job workflow depends on |
 | Self-service sign-up and organization provisioning | Organizations and users exist; creating them is an administrative concern outside this workflow |
 

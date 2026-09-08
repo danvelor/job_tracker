@@ -645,16 +645,28 @@ type JobDetail = JobSummary & {
 `Result` is a discriminated union mirroring the backend's, so both sides speak
 the same failure vocabulary.
 
-**`assigneeName` is derived, not stored.** `JobSummary` carries it because a
-table showing a UUID is useless, but there is no assignee table to join: crew
-administration is out of scope (`context/prd.md` section 9) and `assignee_id`
-deliberately has no foreign key (D-21). The API therefore returns
-`assigneeName` resolved from the seeded roster that the same section keeps
-outside the system — a fixed map in `Jobs.Application`, and the identical map in
-`InMemoryJobsAdapter`. It is not a column, not a join, and not something the
-schema pretends to own. When a Contacts module exists, this is the first thing
-`context/architecture.md` 6.5 would denormalise onto the row via an integration
-event.
+**`assigneeName` comes from a join, against a read-only roster the `jobs` schema
+owns** (D-26). `jobs.assignees` and `jobs.customers` are seeded by migration and
+have no write path: no command creates one, no endpoint mutates one. They exist
+because three controls in A8 — `filter-assignee-select`, `create-job-assignee`
+and `create-job-customer` — need something to offer, and because a table showing
+a UUID is useless.
+
+```ts
+type Party = { readonly id: string; readonly name: string };
+
+interface JobsPort {
+  // …
+  assignees(): Promise<Result<readonly Party[], CoreError>>;
+  customers(): Promise<Result<readonly Party[], CoreError>>;
+}
+```
+
+This is the local replica that `docs/normalization.md` describes: when a Contacts
+module exists, an integration event maintains these rows instead of a seed, and
+nothing else in the design moves. `customer_name` still does not sit on
+`jobs.jobs` — it is joined — so the normalized position that document takes still
+holds.
 
 ## B3. Store contents and selectors
 
@@ -850,7 +862,8 @@ There is no public setter and no `AddPhoto`. Photos arrive only through
 // Jobs.Domain
 public sealed record JobSearchResult(
     Guid Id, string Title, JobStatus Status, DateOnly? ScheduledDate,
-    Guid? AssigneeId, string Street, string City, string State, int PhotoCount);
+    Guid? AssigneeId, string? AssigneeName,
+    string Street, string City, string State, int PhotoCount);
 
 public sealed record JobSearchCriteria(
     string? Text, IReadOnlyList<JobStatus>? Statuses,
@@ -899,6 +912,9 @@ justified by what is in the files rather than by the instruction to make one.
 | `GetJobByIdQuery` / `QueryHandler` | `public sealed` / `internal sealed` | Projection, `AsNoTracking`, returns `Result<JobDetailResponse>`. Serves `GET /api/jobs/{id}`, the route that makes `not-found.tsx` genuine |
 | `IJobRepository` | in `Jobs.Domain` | `GetByIdAsync`, `AddAsync`, `SearchAsync` — see the signature below |
 | `JobSearchResult` | `public sealed record`, in `Jobs.Domain` | The projection `SearchAsync` returns. Not an aggregate: no identity, no behaviour (D-25) |
+| `Assignee`, `Customer` | `public sealed`, extend `Entity`, in `Jobs.Domain` | Read-only rosters (D-26). No factory, no mutating method — EF materialises them and nothing else writes one |
+| `IPartyRepository` | in `Jobs.Domain` | `ListAssigneesAsync`, `ListCustomersAsync`. Two reads, no writes, because there is no write path |
+| `ListAssigneesQuery`, `ListCustomersQuery` / handlers | `public sealed` / `internal sealed` | Serve the two pickers. Projection, `AsNoTracking` |
 | `JobSearchCriteria` | `public sealed record`, in `Jobs.Domain` | The Specification `SearchAsync` takes: text, statuses, date range, assignee, sort field, cursor, limit |
 | `Notification` | `public sealed`, extends `Entity`, in `Jobs.Domain` | `Pending → Sent \| Failed`. `MarkSent` refuses from any state but `Pending` (D-22) |
 | `INotificationSender` | in `Jobs.Application` | Port. Recipient, subject, body in; success or a reason out |
@@ -924,6 +940,8 @@ parameter, because accepting one would invite forging it.
 | `POST` | `/api/jobs/{id}/complete` | `CompleteJobRequest` | `204` | `400`, `404`, `409`, `401` |
 | `POST` | `/api/jobs/{id}/cancel` | `{ reason }` | `204` | `400`, `404`, `409`, `401` |
 | `PATCH` | `/api/jobs/{id}/schedule` | `{ scheduledDate, assigneeId }` | `204` | `400`, `404`, `409`, `401`. `FR-2`: correcting a Scheduled job. `409` when the job has left Scheduled (`BR-2`) or the date is past (`BR-1`) |
+| `GET` | `/api/assignees` | — | `200` + `[{ id, name }]` | `401`. Read-only roster; there is no `POST` |
+| `GET` | `/api/customers` | — | `200` + `[{ id, name }]` | `401`. Read-only roster; there is no `POST` |
 | `POST` | `/auth/dev-token` | — | `200` + `{ token }` | Registered only in Development |
 
 Errors are `application/problem+json` carrying `type`, `title`, `status`,
@@ -939,6 +957,24 @@ SQL file is the annotated deliverable (line 377).
 ```sql
 CREATE SCHEMA IF NOT EXISTS jobs;
 CREATE SCHEMA IF NOT EXISTS billing;
+
+-- Read-only rosters (D-26). Seeded by migration; no command writes them and no
+-- endpoint mutates them. They exist so the assignee and customer pickers have
+-- something to offer and so a job row can show a name instead of a UUID.
+-- When a Contacts module exists, an integration event maintains these rows
+-- instead of the seed — see docs/normalization.md.
+CREATE TABLE jobs.assignees (
+    id              uuid PRIMARY KEY,
+    organization_id uuid NOT NULL,
+    name            text NOT NULL
+);
+
+CREATE TABLE jobs.customers (
+    id              uuid PRIMARY KEY,
+    organization_id uuid NOT NULL,
+    name            text NOT NULL,
+    email           text NOT NULL          -- FR-10 needs somewhere to notify
+);
 
 CREATE TABLE jobs.jobs (
     id                  uuid        PRIMARY KEY,
@@ -959,11 +995,8 @@ CREATE TABLE jobs.jobs (
     cancelled_at        timestamptz NULL,
     cancellation_reason text        NULL,
     signature_url       text        NULL,
-    -- No FK on the next two columns: both identifiers belong to modules outside
-    -- this system's scope (prd.md section 9). A constraint across a boundary this
-    -- schema does not own would be a coupling, not a guarantee. See D-21.
-    assignee_id         uuid        NULL,
-    customer_id         uuid        NOT NULL,
+    assignee_id         uuid        NULL     REFERENCES jobs.assignees(id),
+    customer_id         uuid        NOT NULL REFERENCES jobs.customers(id),
     created_at          timestamptz NOT NULL DEFAULT now(),
     updated_at          timestamptz NOT NULL DEFAULT now(),   -- kept current by the trigger below
 
@@ -1051,13 +1084,15 @@ across replays — a completion timestamp and an outbox row identifier.
 `ck_notifications_sent_has_timestamp` keeps the record honest: a notification
 cannot claim to have been sent without recording when.
 
-There is no foreign key on `customer_id` or `assignee_id`: those identifiers
-belong to modules outside this system's scope (`context/prd.md` section 9), and a
-constraint across a boundary the schema does not own would be a coupling, not a
-guarantee. `billing.invoices.job_id` has no FK into `jobs.jobs` for the same
-reason, one level up — that one is the module boundary itself. Lines 261-262 ask
-for FKs literally, so the reasoning is repeated as a comment in the DDL where a
-reader meets the columns; D-21 records the trade-off.
+`assignee_id` and `customer_id` **do** carry foreign keys, because the rosters
+they point at live in this schema (D-26). Lines 261-262 ask for exactly that.
+
+`billing.invoices.job_id` has **no** foreign key into `jobs.jobs`, and that
+absence is the interesting one: it is the module boundary itself. A constraint
+there would let the database enforce a relationship the two modules deliberately
+express through a contract of primitives, and would make extracting Billing to
+its own database a redesign rather than a migration. The rule is not "no foreign
+keys" — it is *a foreign key stays inside the schema that owns both ends*.
 
 ### Indexes
 
@@ -1093,6 +1128,9 @@ CREATE INDEX ix_invoices_tenant_job ON billing.invoices (organization_id, job_id
 CREATE INDEX ix_notifications_pending
     ON jobs.notifications (created_at)
     WHERE status = 'Pending';
+
+CREATE INDEX ix_assignees_tenant ON jobs.assignees (organization_id);
+CREATE INDEX ix_customers_tenant ON jobs.customers (organization_id);
 ```
 
 ### The search query
@@ -1100,10 +1138,12 @@ CREATE INDEX ix_notifications_pending
 The source for `database/queries.sql`, implementing lines 279-284.
 
 ```sql
-SELECT  j.id, j.title, j.status, j.scheduled_date, j.assignee_id,
+SELECT  j.id, j.title, j.status, j.scheduled_date,
+        j.assignee_id, a.name AS assignee_name,
         j.street, j.city, j.state,
         coalesce(p.photo_count, 0) AS photo_count
 FROM    jobs.jobs j
+LEFT JOIN jobs.assignees a ON a.id = j.assignee_id
 LEFT JOIN LATERAL (
         SELECT count(*) AS photo_count
         FROM   jobs.job_photos ph

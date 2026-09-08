@@ -64,10 +64,26 @@ reads.
 
 ## What this schema actually does
 
-It stays normalized. `customer_name` is **not** on `jobs.jobs` today, because the
-list is served from a seeded set where the join does not yet exist to be
-avoided, and adding a denormalized column with no consumer would be speculation
-rather than design. The analysis above is what would justify adding it, and the
-integration-event machinery that would maintain it is already in place — which
-is the point worth making: the decision is a migration and a handler, not a
-redesign.
+It stays normalized, and it is one step further along this argument than it may
+appear.
+
+`jobs.customers` and `jobs.assignees` exist in the `jobs` schema as read-only
+rosters, seeded at installation, with foreign keys from `jobs.jobs`. That is
+**already the local-replica half** of the pattern described above: the name lives
+close to the read that needs it, inside the boundary that reads it, rather than
+behind a join into a context this schema does not own. What is missing is only
+the other half — a Contacts module publishing `CustomerRenamedIntegrationEvent`
+to keep the replica current. Until that module exists, the seed plays its part.
+
+What has **not** happened is the further step of copying `customer_name` onto
+`jobs.jobs` itself. That would trade a single-schema join, which costs almost
+nothing, for a value duplicated once per job. The condition that would justify it
+is the one stated above and not yet met: the join would have to cross a boundary,
+and here it does not.
+
+So the two decisions sit at different points on the same scale, deliberately.
+The roster is denormalized *across the context boundary* — Jobs holds a copy of
+something Contacts will own — and normalized *within* Jobs, where a join is
+cheap. When Contacts arrives, the first change is an event handler on rows that
+already exist; the second, if the job list ever outgrows the join, is one column
+and one more line in that handler. Neither is a redesign, which is the point.
