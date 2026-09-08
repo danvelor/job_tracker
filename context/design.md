@@ -276,6 +276,15 @@ Every asynchronous assertion in the end-to-end suite waits on one of
 unmounting. No test waits on a fixed timeout, and no selector uses a CSS class or
 visible text.
 
+**Steps 4 and 9 of the walkthrough have no identifier here, on purpose.** The
+crew notification and the invoice never reach the interface — A5 step 6 states
+that completion does not claim they happened — so there is nothing for a
+`data-testid` to point at. The smoke run asserts them against Postgres instead,
+polling `billing.invoices` by `job_id` and `jobs.notifications` by
+`source_event_id` until they appear or a bounded timeout expires
+(`context/architecture.md` 8.1). Adding a testid for them would mean putting a
+claim on screen that `NFR-4` says the product must not make.
+
 ---
 
 # Part B — Technical design

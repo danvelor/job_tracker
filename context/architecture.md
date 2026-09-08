@@ -791,6 +791,47 @@ no database, so it is fast and deterministic in CI. A single smoke run exercises
 the HTTP adapter against the full Compose stack, which is where integration is
 actually proven.
 
+### 8.1 Definition of done
+
+The scope is cut until this holds, and no further:
+
+> The in-memory suite passes in CI, **and** the smoke run completes all nine
+> steps of the acceptance walkthrough (`context/prd.md` section 8) against the
+> Compose stack.
+
+Two of the nine steps cannot be proven without the backend, and they are the two
+that matter most, because they are the asynchronous ones:
+
+| Walkthrough step | In-memory suite | Smoke against Compose |
+|---|---|---|
+| 1. Open the job list | ✓ | ✓ |
+| 2. Create a job through the form | ✓ | ✓ |
+| 3. It appears as **Scheduled** | ✓ | ✓ |
+| **4. The assignee is notified** (`FR-8`) | — | ✓ |
+| 5. Narrow by status and find it | ✓ | ✓ |
+| 6. Record that the crew started | ✓ | ✓ |
+| 7. Complete with signature and photos | ✓ | ✓ |
+| 8. It shows **Completed** | ✓ | ✓ |
+| **9. An invoice exists and the customer was notified** (`FR-9`, `FR-10`) | — | ✓ |
+
+Without the smoke run, nothing executable covers the outbox, the Hangfire drain,
+Billing or the notification handlers — the whole asynchronous half of the system
+would be proven only by unit tests of its parts.
+
+**How the smoke run observes steps 4 and 9.** Neither consequence appears in the
+interface: `context/design.md` A5 step 6 states that completion does not wait for
+them and does not claim they happened. So the `data-testid` contract cannot help,
+and the test queries Postgres directly — `billing.invoices` by `job_id`, and
+`jobs.notifications` by `source_event_id` and status. An integration test reading
+the database the system just wrote is the normal shape of an integration test,
+not a leaked abstraction; the alternative, a diagnostics endpoint, would add
+public surface that D-04 declined to give Billing.
+
+Both assertions poll with a bounded timeout rather than sleeping, because
+`NFR-4` promises the consequences arrive *within seconds*, not immediately — the
+window is the poll interval, and asserting on it is asserting on eventual
+consistency rather than pretending it is synchronous.
+
 ---
 
 ## 9. Binding conventions
@@ -940,6 +981,7 @@ accounts, no manual migration step (`NFR-7`).
 | `backend` | restore, build with warnings as errors, unit tests, architecture tests |
 | `frontend` | install, lint, `tsc --noEmit`, Jest with `coverageThreshold` enforced |
 | `e2e` | build frontend with the in-memory adapter, run Playwright, upload failure screenshots |
+| `smoke` | `docker compose up --wait`, run the smoke spec against the HTTP adapter, assert steps 4 and 9 against Postgres, tear down |
 | `images` | build both Dockerfiles to prove the Compose stack still builds |
 
 `tsc --noEmit` is a separate step from Jest for the reason given in section 8.
