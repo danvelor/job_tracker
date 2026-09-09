@@ -5,7 +5,7 @@ namespace JobTracker.Modules.Jobs.Infrastructure.Outbox;
 /// domain: nothing in the model knows the outbox exists, which is what lets the
 /// poller be replaced by a broker without touching a rule (D-03).
 /// </summary>
-internal sealed class OutboxMessage
+public sealed class OutboxMessage
 {
     private OutboxMessage() { }
 

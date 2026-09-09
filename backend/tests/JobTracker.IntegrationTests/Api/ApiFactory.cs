@@ -28,6 +28,13 @@ public sealed class ApiFactory(string connectionString, string environment = "De
         builder.UseSetting("Jwt:Key", SigningKey);
         builder.UseSetting("Jwt:Issuer", Issuer);
         builder.UseSetting("Jwt:Audience", Audience);
+
+        // The host starts a real Hangfire server, because registering the
+        // recurring job is part of what these tests check. The poll is pushed
+        // to the far end of what a seconds-cron accepts so it never fires
+        // mid-test: a drain running under a test would make every assertion
+        // about outbox rows a race. Tests that want a drain call the processor.
+        builder.UseSetting("Outbox:PollSeconds", "59");
     }
 
     /// <summary>
@@ -35,12 +42,18 @@ public sealed class ApiFactory(string connectionString, string environment = "De
     /// registration, so a test starts from a clean schema without knowing how
     /// the host wired it.
     /// </summary>
+    /// <summary>
+    /// Truncates rather than dropping and re-migrating. Dropping the database
+    /// would pull it out from under the Hangfire server this host is running,
+    /// and the rosters are seeded by migration so they must survive.
+    /// </summary>
     public async Task ResetSchemaAsync()
     {
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<JobsDbContext>();
-        await context.Database.EnsureDeletedAsync();
         await context.Database.MigrateAsync();
+        await context.Database.ExecuteSqlRawAsync(
+            "truncate jobs.jobs, jobs.job_photos, jobs.outbox_messages cascade");
     }
 
     public async Task<HttpClient> AuthenticatedClientAsync(Guid organizationId)

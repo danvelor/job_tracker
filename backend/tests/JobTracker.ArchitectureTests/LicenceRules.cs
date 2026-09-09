@@ -26,4 +26,18 @@ public sealed class LicenceRules
         typeof(FluentAssertions.AssertionExtensions).Assembly.GetName().Version!.Major
             .Should().BeLessThan(8);
     }
+
+    [Fact]
+    public void Hangfire_is_the_open_source_package_rather_than_Pro()
+    {
+        // D-20. Hangfire's LICENSE.md is multi-licensed with LGPL v3 among the
+        // options, which referencing the unmodified package satisfies. The paid
+        // tier is the separate Hangfire.Pro.* packages — and a reviewer running
+        // dotnet restore without a licence is otherwise who finds out.
+        typeof(Hangfire.BackgroundJob).Assembly.GetName().Name.Should().Be("Hangfire.Core");
+
+        AppDomain.CurrentDomain.GetAssemblies()
+            .Select(assembly => assembly.GetName().Name!)
+            .Should().NotContain(name => name.StartsWith("Hangfire.Pro", StringComparison.Ordinal));
+    }
 }

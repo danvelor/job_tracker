@@ -43,7 +43,8 @@ builder.Services.AddSingleton<TokenIssuer>();
 
 builder.Services.AddJobsModule(
     builder.Configuration.GetConnectionString("Database")
-    ?? throw new InvalidOperationException("ConnectionStrings:Database is required."));
+    ?? throw new InvalidOperationException("ConnectionStrings:Database is required."),
+    builder.Configuration);
 
 builder.Services.AddEndpoints(JobsPresentation.Assembly);
 builder.Services.AddOpenApi();
@@ -62,6 +63,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapEndpoints();
+
+app.Services.UseJobsModule();
 
 app.Run();
 

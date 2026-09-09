@@ -31,7 +31,11 @@ public abstract class IntegrationTestBase(PostgresFixture postgres) : IAsyncLife
 
     private DbContextOptions<JobsDbContext> BuildOptions() =>
         new DbContextOptionsBuilder<JobsDbContext>()
-            .UseNpgsql(postgres.ConnectionString)
+            .UseNpgsql(postgres.ConnectionString, npgsql =>
+                // The same history table JobsModule configures. With two of
+                // them over one database each migrator saw the other's history
+                // as empty and tried to create every table again.
+                npgsql.MigrationsHistoryTable("__EFMigrationsHistory", JobsDbContext.Schema))
             .UseSnakeCaseNamingConvention()
             // The same registration JobsModule makes. A harness without it
             // would test a context the application never builds.
