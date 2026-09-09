@@ -29,7 +29,7 @@ here, artefact there**.
 | Server state (frontend) | SWR 2 | Owns fetched data. Lighter than React Query and sufficient: optimistic behaviour is implemented in the store, not the fetcher |
 | Client state (frontend) | Zustand 5 | UI state only. See section 5.5 |
 | Styling | Tailwind CSS v4 | Utility-first keeps atoms free of their own stylesheets and adds no runtime |
-| Backend tests | xUnit, Moq, **FluentAssertions 7.x, pinned**, NetArchTest | Mandated (lines 313-316, 440). FluentAssertions 8 and later are commercially licensed, so the pin is the same defence as MediatR's: a reviewer must be able to `dotnet test` without buying anything (D-20) |
+| Backend tests | xUnit, Moq, **FluentAssertions 7.x, pinned**, NetArchTest, Testcontainers.PostgreSql | Mandated (lines 313-316, 440). FluentAssertions 8 and later are commercially licensed, so the pin is the same defence as MediatR's: a reviewer must be able to `dotnet test` without buying anything (D-20) |
 | Frontend tests | Jest with `next/jest`, React Testing Library, `expect-type` | See decision D-07 |
 | End-to-end tests | Playwright | Mandated |
 | Local orchestration | Docker Compose | Mandated (line 490) |
@@ -77,6 +77,7 @@ job_tracker/
 │       ├── ...Jobs.Domain.UnitTests/
 │       ├── ...Jobs.Application.UnitTests/
 │       ├── ...Billing.Application.UnitTests/         invariants, handler, double delivery
+│       ├── JobTracker.IntegrationTests/              Testcontainers: real Postgres, real EF
 │       └── JobTracker.ArchitectureTests/
 └── frontend/
     └── src/
@@ -835,6 +836,7 @@ logs. Distributed tracing is out of scope by decision (D-15).
 | Domain | xUnit, FluentAssertions | Every invariant in `context/prd.md` section 6; valid and invalid transitions; `Address` structural equality including inequality and hash consistency; that `JobPhoto` cannot be added except through the aggregate |
 | Application | xUnit, Moq | Handler orchestration with mocked repository and unit of work; that completion raises `JobCompletedDomainEvent`; that failures return `Result` rather than throwing; validator rules |
 | Billing | xUnit, Moq | `Invoice`'s own invariants; `GenerateInvoiceOnJobCompletedHandler` with a mocked repository; and **the same integration event delivered twice, asserting one invoice** — which is where the idempotency claim of 4.5 is actually proven rather than described |
+| Integration | xUnit, Testcontainers.PostgreSql | Everything only a real database can answer — section 8.2 |
 | Architecture | NetArchTest | Every rule in section 9; layer dependency direction; no module referencing another's internals; tenant query filter present on all tenant-scoped entities |
 | Frontend behaviour | Jest, React Testing Library | `useCreateJob` reducer transitions and validation; the Server Action call; store selectors; optimistic update and rollback, with `act()` around every state change |
 | Frontend types | `expect-type`, `tsc --noEmit` | `DeepReadonly` over nested objects, arrays, `Map`, `Set` and tuples; `PathKeys` output; `QueryBuilder` narrowing across the chain; that invalid `transitionJob` calls are compile errors |
@@ -854,14 +856,6 @@ gave Billing a domain of its own on the grounds that an `Invoice` with invariant
 demonstrates a bounded context that is not anemic. A module whose invariants
 nothing exercises demonstrates the opposite, so `Billing.Application.UnitTests`
 exists to make the claim checkable.
-
-**There is no backend integration-test project, by choice.** Nothing in the
-backend suites verifies the EF mapping — the owned `Address`, the enum stored as
-text, snake_case, the tenant query filter — because the smoke run of 8.1 covers
-all of it against a real PostgreSQL. Adding a third kind of backend test would
-duplicate that coverage and compete with finishing. The cost is honest and worth
-naming: a mistake in the EF configuration surfaces at step 2 of the walkthrough
-rather than at the line that caused it.
 
 **End-to-end runs against the in-memory adapter.** The suite needs no backend and
 no database, so it is fast and deterministic in CI. A single smoke run exercises
@@ -908,6 +902,129 @@ Both assertions poll with a bounded timeout rather than sleeping, because
 `NFR-4` promises the consequences arrive *within seconds*, not immediately — the
 window is the poll interval, and asserting on it is asserting on eventual
 consistency rather than pretending it is synchronous.
+
+### 8.2 Integration tests
+
+`JobTracker.IntegrationTests` starts a PostgreSQL container with
+Testcontainers, applies the migrations, and exercises the infrastructure layer
+against it. It exists for two reasons, and the second is the one that decided
+it (D-27).
+
+The first is that a whole category of production code has no other test. EF
+configuration, a global query filter and a keyset predicate are not behaviour a
+mock can report on; they are behaviour a database has.
+
+The second is that **development is test-driven** (D-28), and the red-green loop
+needs a test that runs in seconds. The smoke run of 8.1 does cover this
+ground, but as a feedback loop it is unusable: no one brings up the whole
+Compose stack to find out whether `Address` mapped to six columns. Without a
+suite at this level, the entire infrastructure layer would be written blind and
+verified at the end, which is the opposite of the discipline.
+
+| # | What it proves | Why a unit test cannot |
+|---|---|---|
+| 1 | Migrations apply to an empty database | There is nothing to assert against otherwise |
+| 2 | `Address` round-trips through six flattened columns | Owned-type mapping is EF configuration, not code a mock sees |
+| 3 | `JobStatus` is stored as text and column names are snake_case | A convention is either applied by the provider or it is not |
+| 4 | A query written with **no** tenant condition returns only the acting organization's rows | `NFR-1` in full. A mocked repository proves nothing about a global query filter |
+| 5 | A job's state change and its outbox rows commit together, and a rollback leaves neither | `NFR-2`. A unit test shows the interceptor was called, not that the transaction is one |
+| 6 | Successive keyset pages are disjoint and complete, **including a row whose `scheduled_date` is null** | This is the regression guard for the bug in 6.4: over a bare column the comparison yields NULL and the row silently disappears after page one |
+| 7 | Full-text search matches title and description through `websearch_to_tsquery` | The GIN expression index and the query expression have to be the same expression, or neither works |
+| 8 | The lateral photo count is right per row | |
+| 9 | `uq_invoices_idempotency` and `uq_notifications_idempotency` actually reject a duplicate | The constraint is the whole of 4.5; a test that never inserts twice never checks it |
+
+**These tests assert behaviour, never query plans.** It is tempting to assert
+that the planner chose `ix_jobs_tenant_keyset`, and it would be a bad test: the
+choice depends on table statistics and row counts, so it fails on a small
+fixture for reasons that have nothing to do with a defect. The plans belong in
+`database/queries.sql` as captured `EXPLAIN (ANALYZE, BUFFERS)` output — evidence
+a reader can check — while the suite asserts that paging returns the right rows
+in the right order.
+
+This does not replace the smoke run. Section 8.1 proves the *nine steps* end to
+end through a browser; 8.2 proves the *infrastructure* in isolation, fast enough
+to drive a red-green cycle. They overlap on purpose: one is a feedback loop, the
+other is the definition of done.
+
+### 8.3 How development proceeds
+
+Every line of production code is written to satisfy a test that was **watched
+failing first** (D-28). A test written afterwards passes immediately, which
+proves nothing about whether it can catch the defect it describes.
+
+**Outside-in, one slice of the walkthrough at a time.** The acceptance suite is
+fully specified before any code exists — `context/design.md` A8 fixes every
+selector and `context/prd.md` section 8 fixes the nine steps — so the outer red
+is available from the first day. It is not written all at once, because a suite
+that stays red for days leaves CI red for days:
+
+```
+outer red:  steps 1-3   open the list, create, appears Scheduled
+                ↓  inner unit cycles until green
+outer red:  + step 5    filter by status
+                ↓
+outer red:  + steps 6-8 start, complete, shows Completed
+                ↓
+outer red:  + steps 4, 9   the asynchronous pair, against Compose
+```
+
+Every commit is green; the failing outer step is the list of what is missing.
+Steps 4 and 9 come last because they need the backend, the outbox draining and
+Billing writing — the critical path, and the slowest thing to turn green.
+
+**Architecture tests get two mechanisms, because NetArchTest is unusually easy to
+write so that it can never fail.** A wrong suffix, a case mismatch, or
+`BeSealed()` where `BeSealed().And().BeNotPublic()` was meant, all yield an
+assertion over an empty set — which passes.
+
+1. **A non-emptiness guard on every rule, permanently.** Each rule asserts that
+   the set it examines is non-empty before asserting anything about it. The rule
+   cannot pass vacuously today against a solution with no types, nor in a year
+   when a rename leaves it pointing at nothing
+2. **A deliberate red, once per rule.** The first `CreateJobCommandHandler` is
+   written `public`, the rule is watched failing, and then the modifier is
+   corrected. Fifteen seconds, and it is the only thing that demonstrates the
+   assertion is wired to what its name claims
+
+**What is exempt, and the rule that decides it.** An artefact is outside the
+cycle when either condition holds:
+
+- **(a)** no test can exist before it does — a bootstrapping problem
+- **(b)** its correctness already *is* the pass or fail of a CI job
+
+| Artefact | Condition |
+|---|---|
+| `.sln`, `.csproj` | (a) — a test lives inside a `.csproj`; none can assert that projects exist |
+| `docker-compose.yml` | (b) — the `smoke` job fails when it is wrong |
+| Both `Dockerfile`s | (b) — the `images` job builds them |
+| `.github/workflows/ci.yml` | (b) — it is tested by running |
+| `jest.config` (`coverageThreshold`) | (b) — self-enforcing: coverage below the threshold fails the run |
+| `tsconfig` (`strict: true`) | (b) — the `expect-type` assertions only hold under `strict`; turning it off fails the types job |
+
+The rule is stated rather than the list, so a new artefact classifies itself.
+Anything meeting neither condition gets a test, including one that looks like
+configuration:
+
+**The licence pins are not exempt.** Nothing fails today if MediatR moves to 13
+or FluentAssertions to 8: it compiles, the tests pass, and the defect appears
+when a reviewer runs `dotnet restore` without a licence and cannot build the
+deliverable — which is the failure D-20 calls a gate rather than a preference.
+Two assertions in `JobTracker.ArchitectureTests` close it:
+
+```csharp
+[Fact]
+public void Mediatr_stays_below_the_commercially_licensed_major()
+    => typeof(IMediator).Assembly.GetName().Version!.Major.Should().Be(12);
+
+[Fact]
+public void FluentAssertions_stays_below_the_commercially_licensed_major()
+    => typeof(AssertionExtensions).Assembly.GetName().Version!.Major.Should().BeLessThan(8);
+```
+
+They assert on the **loaded assembly** rather than on the XML of
+`Directory.Packages.props`, which checks what was actually restored and catches a
+transitive bump the file would not mention. Section 9 says a convention that is
+not enforced is a suggestion; this is what stops D-20 from being one.
 
 ---
 
@@ -1056,6 +1173,7 @@ accounts, no manual migration step (`NFR-7`).
 | Job | Steps |
 |---|---|
 | `backend` | restore, build with warnings as errors, unit tests, architecture tests |
+| `integration` | Testcontainers brings up PostgreSQL, applies migrations, runs `JobTracker.IntegrationTests`. Needs Docker, which the runner already provides for `smoke` |
 | `frontend` | install, lint, `tsc --noEmit`, Jest with `coverageThreshold` enforced |
 | `e2e` | build frontend with the in-memory adapter, run Playwright, upload failure screenshots |
 | `smoke` | `docker compose up --wait`, run the smoke spec against the HTTP adapter, assert steps 4 and 9 against Postgres, tear down |
@@ -1102,6 +1220,8 @@ that has teeth.
 | **D-24** | Billing publishes no contract; there is no `Billing.IntegrationEvents` project | Keeping it with an `InvoiceRaisedIntegrationEvent` and no consumer; inventing a consumer in Jobs | Nothing needs to learn that an invoice was raised — `context/prd.md` section 9 excludes collection, tax and documents, and A5 step 6 says the interface does not claim it happened. The 3.2 diagram drew an arrow with no type behind it, and one false arrow costs the credibility of the three that are correct | The flow is one-way. Billing reads as a consumer, which is what it is |
 | **D-25** | `IJobRepository.SearchAsync` returns `IReadOnlyList<JobSearchResult>`, a projection declared in `Jobs.Domain`; the handler builds the `PagedList<JobResponse>` envelope | Returning `Job` aggregates; or letting the query handler reach the `DbContext` directly | Lines 220 and 208 contradict each other — one puts `SearchAsync` in the domain, the other demands projections without tracking. Aggregates fail 208; bypassing the repository lands on the rubric's *Insufficient* descriptor for Repository + UoW ("Direct DbContext usage in handlers", line 419) and leaves a dead method in the interface the assessment asked for | The domain declares a read model, which strict CQRS would place in the application layer (3.6). `JobSearchCriteria` is modelled as a Specification, where such a type does belong |
 | **D-26** | `jobs.assignees` and `jobs.customers` are read-only rosters in the `jobs` schema, seeded by migration, with real foreign keys from `jobs.jobs` and two `GET` endpoints for the pickers | Keeping a hardcoded map in `Jobs.Application` mirrored in `InMemoryJobsAdapter`; denormalising the names onto `jobs.jobs` | Three controls in A8 need a roster, and under the definition of done in 8.1 the smoke run creates a job through the form against the real backend — two hardcoded maps can disagree and fail at step 2 rather than where the cause is. `context/prd.md` §9 excludes crew and customer *administration*, not their existence; these tables have no write path. `docs/normalization.md` calls a local replica the correct home for such a name, and `customer_name` still is not a column on `jobs.jobs` | Two tables and a seed the assessment never asked for, and D-21 reversed. In exchange, lines 261-262 are satisfied literally and the rubric's "correct FK relationships" stops being forfeited |
+| **D-27** | `JobTracker.IntegrationTests` runs the infrastructure layer against a real PostgreSQL started by Testcontainers | Relying on the 8.1 smoke run as the only integration coverage | EF configuration, the tenant query filter, the outbox transaction and the keyset predicate are behaviour a database has and a mock cannot report. The keyset case is a proven risk, not a hypothetical: the null-date bug in 6.4 was found by reading and nothing would have caught its return. And under D-28 the red-green loop needs a test that runs in seconds, which `docker compose up` is not | A test project and a Docker dependency in CI, both of which the `smoke` job already required. Runs slower than the unit suites, so it is a separate CI job |
+| **D-28** | All development is test-driven: no production code without a test that was watched failing first | Writing tests after each unit of work | Tests written afterwards pass immediately, which proves nothing about whether they can catch the defect they describe. It also produces the incremental commit history line 495 asks for, rather than a history reconstructed to look incremental | Scaffolding and configuration are exempt under the two conditions in 8.3 — but the licence pins of D-20 are not, and get assertions of their own. Type-level assertions verify red through `tsc --noEmit` rather than the test runner |
 
 ---
 
@@ -1142,4 +1262,6 @@ that has teeth.
 | Architecture diagram, SOLID, GRASP, GoF, DDD concepts (`docs/design-principles.md`) | lines 337-369 | 6 — all four criteria | 15 |
 | Testing strategy (section 8) | lines 300-333 | 5 — all three criteria | 15 |
 | Architecture tests enforcing section 9 | lines 316, 421 | 3 — Clean Architecture, 5 — Backend tests | 3 + 5 |
+| Integration tests over a real PostgreSQL (section 8.2) | lines 208, 229-232, 283 | 3 — Repository and UoW, 4 — Indexing | 5 + 3 |
+| Test-driven development, outside-in (section 8.3) | lines 300-333, 495 | 5 — all three criteria | 15 |
 | Compose stack and CI (section 10) | lines 479, 490 | Bonus, and the build gate | +3 |

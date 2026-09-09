@@ -35,8 +35,13 @@ this repository's local config.
 
 1. **The build stays green.** A partial implementation is acceptable; a broken
    build is not. Never leave the tree in a state that does not compile.
-2. **Tests pass.** A failing test is worse than an absent one.
-3. **No `any`, no `as unknown as X`** in TypeScript. No public setters on a
+2. **Tests pass.** A failing test is worse than an absent one. The red phase of
+   TDD is the exception that proves it: red lives inside the cycle and is never
+   committed. What must be green is every commit, not every moment.
+3. **Development is test-driven.** No production code without a test that was
+   watched failing first (architecture 8.3, D-28). Scaffolding and configuration
+   are exempt under the two conditions in 8.3; the licence pins are not.
+4. **No `any`, no `as unknown as X`** in TypeScript. No public setters on a
    .NET aggregate.
 
 ## Backend conventions
