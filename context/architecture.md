@@ -360,10 +360,11 @@ Both are durable because Hangfire persists its own state in Postgres, in the
 The pipeline end to end:
 
 ```
-Job.Create()                              Job.Complete()
-  │ raises JobCreatedDomainEvent            │ raises JobCompletedDomainEvent
-  └──────────────────┬─────────────────────-┘
-                     ▼
+Job.Create()             Job.Cancel()             Job.Complete()
+  │ JobCreated             │ JobCancelled           │ JobCompleted
+  │ DomainEvent            │ DomainEvent            │ DomainEvent
+  └───────────────────────-┴───────────┬───────────-┘
+                                       ▼
 InsertOutboxMessagesInterceptor ── same transaction ──▶ jobs.outbox_messages
                      │
                      ▼  [Hangfire recurring job, 10s]
@@ -371,6 +372,9 @@ OutboxProcessor  ── FOR UPDATE SKIP LOCKED ──▶ MediatR publish
      │
      ├─▶ NotifyAssigneeOnJobCreatedHandler        (FR-8, stays inside Jobs)
      │        └─▶ jobs.notifications  Pending ─┐
+     │                                         │
+     ├─▶ NotifyAssigneeOnJobCancelledHandler      (FR-12, stays inside Jobs)
+     │        └─▶ jobs.notifications  Pending ─┤
      │                                         │
      ├─▶ JobCompletedDomainEventHandler ──▶ JobCompletedIntegrationEvent
      │        │                                │
@@ -386,12 +390,20 @@ OutboxProcessor  ── FOR UPDATE SKIP LOCKED ──▶ MediatR publish
                               INotificationSender ──▶ log line ──▶ MarkSent
 ```
 
-**`FR-8` is the counter-example that makes section 4.1 concrete.**
-`JobCreatedDomainEvent` never becomes an integration event, because notifying the
-assignee stays inside Jobs and no other module needs to know. `JobCompleted`
-does cross, because Billing exists. One event of each kind is what makes the
-distinction demonstrable rather than merely stated. `JobCancelledDomainEvent` is
-a second internal-only case: cancelling neither bills nor notifies.
+**`FR-8` and `FR-12` are the counter-examples that make section 4.1
+concrete.** `JobCreatedDomainEvent` and `JobCancelledDomainEvent` never become
+integration events, because notifying the crew stays inside Jobs and no other
+module needs to know. `JobCompleted` does cross, because Billing exists. Two
+internal events against one that crosses is what makes the distinction
+demonstrable rather than merely stated.
+
+`FR-12` is the case that states it most precisely. Cancelling does real work —
+a notification is drafted, queued, and sent — and none of it leaves the module.
+What sends an event across the boundary is therefore **another module needing
+it**, never the event having consequences. Before `FR-12`, cancellation was an
+internal event with no consumer at all, which left that reading available: an
+event might look internal merely because nothing happened. D-37 records why the
+consumer was added.
 
 The poller is the only piece a message broker would replace. Nothing in
 `Domain`, `Application` or the contracts would change, which is why a broker is
@@ -1230,6 +1242,7 @@ that has teeth.
 | **D-34** | A domain event carries its own identity, generated when it is raised, and the outbox row adopts it as its primary key | Passing the outbox row's identifier to handlers through ambient scoped state | 4.5 says `source_event_id` is the row's identifier, and a handler receives a deserialised event rather than the row. Making the two the same value keeps 4.5 literally true, leaves the system with no hidden context, and makes it impossible to enqueue one event twice | `IDomainEvent` gained two members and a base record. `OccurredOn` reads a clock, which the time-as-a-parameter rule otherwise forbids — it is an audit stamp no rule reads, and threading `now` into every initialiser would buy no test anything |
 | **D-35** | Every domain event carries its `OrganizationId`, and the outbox drain sets the tenant from it before publishing | Letting background handlers query with the filter lifted; or a tenant resolved from configuration | The drain runs with no request, no principal and no claim, so every tenant-scoped query a handler makes has nothing to filter by — not subtly, but as an exception on the first read. Found by the first end-to-end run. Lifting the filter for background work would make NFR-1 hold only for HTTP, which is where it is least needed | `ITenantContextSetter` exists alongside `ITenantContext`: reading a tenant is something every layer does, setting one is something exactly two places may do. A handler that could set its own tenant could read another's data |
 | **D-36** | Background work carries its tenant explicitly, and queued work is dispatched only after the transaction that produced it commits | Enqueueing on the spot and letting Hangfire's retry absorb the race | Found by the Compose stack, not by a test. Both notifications sat at `Pending` while every Hangfire job reported success. Three faults compounded: the send job ran with no claim so its query threw (the same shape as D-35, in the path D-35 did not cover); the job was queued inside the outbox transaction, so the worker read a row no other connection could see yet; and `MediatorJobRunner` discarded the handler's `Result`, so a failure was reported as success — no retry, no log, nothing anywhere saying why | `IBackgroundQueue` gained `Flush`, and only the owner of a transaction calls it. Every earlier test ran the send inline on a context whose tenant was already set, so none of them could have caught any of this — which is the argument for the smoke run existing at all |
+| **D-37** | Cancelling a job notifies the crew it was assigned to, and the notification carries the reason (`FR-12`) | Leaving `JobCancelledDomainEvent` without a consumer, as the assessment does; or notifying the customer instead, mirroring `FR-10` | A cancellation the crew learns about on site is an operational failure the product can prevent, and `BR-5` already forces a reason to exist. The crew rather than the customer because the reason is written for internal review and is not always the customer's business, and because the crew is the party with the job on their schedule. The argument in 4.4 comes out stronger: an internal event that does real work shows that what crosses the boundary is another module's need, not the event having consequences | `JobCancelledDomainEvent` gained `AssigneeId`, nullable because a job cancelled before it was scheduled never reached a crew. The end-to-end test that asserted cancellation notifies nobody now asserts it notifies the crew and still never bills — the half that carries the architectural argument is the invoice count, and that half is unchanged. `FR-12` is beyond the assessment, and the traceability matrix says so |
 
 ---
 

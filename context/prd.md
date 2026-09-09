@@ -156,7 +156,8 @@ Office staff call a job off, supplying a reason. The reason is mandatory: a
 cancelled job with no explanation is not auditable.
 
 *Accepted when:* the job moves to Cancelled from Scheduled or InProgress, carries
-the timestamp and reason, and is refused from a terminal state per `BR-2`.
+the timestamp and reason, is refused from a terminal state per `BR-2`, and
+triggers `FR-12`.
 
 ### FR-6 — Search and filter jobs
 
@@ -204,6 +205,17 @@ Every read and every write is confined to the acting user's organization.
 
 *Accepted when:* no listing, search, count, aggregate, direct fetch by
 identifier, or notification can reach a record of another organization.
+
+### FR-12 — Notify the crew on cancellation
+
+Cancelling a job notifies the crew it was assigned to, and tells them why. A
+crew that learns of a cancellation by arriving on site has learned too late,
+and the reason is what stops them from asking.
+
+*Accepted when:* exactly one notification per cancellation reaches the assignee
+and carries the reason, a job cancelled before it was ever assigned notifies
+nobody, and cancellation succeeds even when the messaging system is unavailable
+at that moment.
 
 ---
 
@@ -326,6 +338,7 @@ section that scores them.
 | `FR-9` invoice | lines 189, 240 | 3 — Outbox, 6 — DDD concepts | 4 + 3 |
 | `FR-10` notify customer | lines 189, 241 | 3 — Outbox and Hangfire | 4 |
 | `FR-11` tenant isolation | lines 170, 261, 347 | 4 — Schema design, 6 — Diagram | 4 + 3 |
+| `FR-12` notify crew on cancellation | none — see below | 3 — Outbox and Hangfire | 4 |
 | `BR-1` no past scheduling | line 172 | 3 — Aggregate, 5 — Backend tests | 7 + 5 |
 | `BR-2` terminal states | line 173 | 3 — Aggregate, 5 — Backend tests | 7 + 5 |
 | `BR-3` start only from Scheduled | line 174 | 3 — Aggregate, 5 — Backend tests | 7 + 5 |
@@ -354,6 +367,19 @@ rather than invented as business needs.
 | Type-level utilities (`DeepReadonly`, `PathKeys`) | lines 24-34 | 1 — TypeScript mastery | 5 |
 | Typed event emitter | lines 36-42 | 1 — TypeScript mastery | part of 15 |
 | Chainable query builder | lines 47-63 | 1 — Type-safe builder | 5 |
+
+### Requirements beyond the assessment
+
+The assessment requires `JobCancelledDomainEvent` to be raised (line 175) and
+gives it no consumer: only creation and completion are said to notify (lines
+188-189). `FR-12` gives cancellation a consumer anyway, because a job that is
+called off and a crew that is not told is a real operational failure, and
+because an internal event that does work is a better counter-example to
+integration events than one that does none — see architecture 4.4.
+
+| Requirement | Assessment source | Why it is here |
+|---|---|---|
+| `FR-12` notify crew on cancellation | none. Line 175 raises the event; no line consumes it | The operational gap above, and it strengthens the domain-versus-integration argument the assessment does ask for (line 244) |
 
 ### Assessment contradictions resolved in this document
 

@@ -177,7 +177,7 @@ public sealed class Job : AggregateRoot, ITenantScoped
         CancelledAt = cancelledAt;
         CancellationReason = reason;
 
-        Raise(new JobCancelledDomainEvent(Id, reason) { OrganizationId = OrganizationId });
+        Raise(new JobCancelledDomainEvent(Id, AssigneeId, reason) { OrganizationId = OrganizationId });
 
         return Result.Success();
     }
