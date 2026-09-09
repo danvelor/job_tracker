@@ -143,15 +143,25 @@ export function createHttpJobsAdapter(config: HttpJobsAdapterConfig): JobsPort {
     init: RequestInit,
     read: (response: Response) => Promise<T>,
   ): Promise<Result<T, CoreError>> {
-    try {
-      const response = await fetch(`${baseUrl}${path}`, {
+    const send = async (options?: { readonly refresh?: boolean }): Promise<Response> =>
+      fetch(`${baseUrl}${path}`, {
         ...init,
         headers: {
           ...(init.body === undefined ? {} : { 'content-type': 'application/json' }),
-          authorization: `Bearer ${await token()}`,
+          authorization: `Bearer ${await token(options)}`,
         },
         cache: 'no-store',
       });
+
+    try {
+      const first = await send();
+
+      // The development token lives an hour and the Next server outlives it,
+      // so a 401 is far more often an expired token than a refused one. One
+      // refreshed retry is the difference between a page that recovers by
+      // itself and a page that needs the container restarted. Exactly one: a
+      // 401 that is not about expiry must not loop.
+      const response = first.status === 401 ? await send({ refresh: true }) : first;
 
       return response.ok ? ok(await read(response)) : err(await toCoreError(response));
     } catch (cause: unknown) {

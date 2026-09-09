@@ -8,8 +8,13 @@ import 'server-only';
  *
  * A real deployment replaces this one function with an identity provider, and
  * nothing else in the design moves.
+ *
+ * The optional argument is how a caller says "the one you gave me was
+ * refused". It stays a plain function so that replacement remains a
+ * one-function job, and so a source that ignores refreshing — a fixed token in
+ * a test — is still assignable.
  */
-export type TokenSource = () => Promise<string>;
+export type TokenSource = (options?: { readonly refresh?: boolean }) => Promise<string>;
 
 export function createDevTokenSource(baseUrl: string, organizationId: string): TokenSource {
   // Cached as a promise rather than a string, so two concurrent requests on a
@@ -41,7 +46,14 @@ export function createDevTokenSource(baseUrl: string, organizationId: string): T
     return (body as { token: string }).token;
   };
 
-  return () => {
+  return (options) => {
+    // A token that the API refused is worth no more than no token at all.
+    // Without this the cache outlives the token's hour and every render fails
+    // until the process restarts — which no reload does.
+    if (options?.refresh === true) {
+      pending = null;
+    }
+
     pending ??= fetchToken().catch((cause: unknown) => {
       pending = null;
       throw cause;

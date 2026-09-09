@@ -71,7 +71,7 @@ That is what lets the browser suite run with neither backend nor database.
 # Backend: 310 tests — domain, application, architecture, integration
 dotnet test backend/JobTracker.sln
 
-# Frontend: 230 tests, with an 80% coverage gate that fails the run
+# Frontend: 232 tests, with an 80% coverage gate that fails the run
 npm --prefix frontend run test:coverage
 
 # Types. Separate on purpose: expect-type assertions fail at compile time,
@@ -153,7 +153,7 @@ The full diagram, plus SOLID, GRASP, GoF and DDD analysis, is in
 
 ## Decisions and trade-offs
 
-Thirty-seven decisions are recorded with their alternatives, rationale and cost
+Thirty-eight decisions are recorded with their alternatives, rationale and cost
 in [`context/architecture.md` §11](context/architecture.md). The ones a reviewer
 is most likely to want explained:
 
