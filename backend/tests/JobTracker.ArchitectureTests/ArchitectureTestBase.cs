@@ -12,6 +12,9 @@ public abstract class ArchitectureTestBase
     protected static readonly Assembly JobsApplication =
         typeof(Modules.Jobs.Application.Jobs.CreateJob.CreateJobCommand).Assembly;
 
+    protected static readonly Assembly JobsPresentation =
+        Modules.Jobs.Presentation.JobsPresentation.Assembly;
+
     protected static readonly Assembly CommonDomain = typeof(Common.Domain.Entity).Assembly;
 
     /// <summary>

@@ -25,4 +25,16 @@ internal sealed class PartyRepository(JobsDbContext context) : IPartyRepository
         await context.Customers.AsNoTracking()
             .OrderBy(customer => customer.Name)
             .ToListAsync(cancellationToken);
+
+    // The query filter is what makes these answer membership rather than
+    // existence: a roster row in another organization is simply not there.
+    public Task<bool> AssigneeExistsAsync(
+        Guid assigneeId, Guid organizationId, CancellationToken cancellationToken = default) =>
+        context.Assignees.AsNoTracking()
+            .AnyAsync(assignee => assignee.Id == assigneeId, cancellationToken);
+
+    public Task<bool> CustomerExistsAsync(
+        Guid customerId, Guid organizationId, CancellationToken cancellationToken = default) =>
+        context.Customers.AsNoTracking()
+            .AnyAsync(customer => customer.Id == customerId, cancellationToken);
 }

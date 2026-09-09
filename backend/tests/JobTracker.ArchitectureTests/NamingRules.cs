@@ -1,4 +1,5 @@
 using FluentAssertions;
+using JobTracker.Common.Presentation;
 using NetArchTest.Rules;
 
 namespace JobTracker.ArchitectureTests;
@@ -69,5 +70,33 @@ public sealed class NamingRules : ArchitectureTestBase
             .That().AreInterfaces().And().HaveNameEndingWith("Repository")
             .GetTypes().Should().BeEmpty(
                 "a repository interface belongs to the domain that owns the aggregate");
+    }
+
+    [Fact]
+    public void Every_endpoint_is_internal_and_sealed()
+    {
+        // Architecture 9.1. An endpoint is reached by the assembly scan and by
+        // nothing else; a public one invites a caller that bypasses routing.
+        var subject = Types.InAssembly(JobsPresentation)
+            .That().ImplementInterface(typeof(IEndpoint));
+
+        ShouldHold(subject.Should().NotBePublic().And().BeSealed(), subject);
+    }
+
+    [Fact]
+    public void Every_type_in_Presentation_that_maps_a_route_is_an_endpoint()
+    {
+        // The rule above only sees types that remembered to implement the
+        // interface. This one catches the earlier mistake: a class in
+        // Presentation that is not an endpoint and not a request record has no
+        // business being there.
+        var strays = Types.InAssembly(JobsPresentation)
+            .That().AreClasses().And().ArePublic()
+            .GetTypes()
+            .Where(type => type != typeof(Modules.Jobs.Presentation.JobsPresentation))
+            .Select(type => type.Name)
+            .ToList();
+
+        strays.Should().BeEmpty();
     }
 }

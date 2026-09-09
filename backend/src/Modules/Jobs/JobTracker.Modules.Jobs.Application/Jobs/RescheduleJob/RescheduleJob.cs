@@ -11,6 +11,7 @@ public sealed record RescheduleJobCommand(
 
 internal sealed class RescheduleJobCommandHandler(
     IJobRepository jobs,
+    IPartyRepository parties,
     IUnitOfWork unitOfWork,
     TimeProvider time) : IRequestHandler<RescheduleJobCommand, Result>
 {
@@ -27,6 +28,15 @@ internal sealed class RescheduleJobCommandHandler(
         if (rescheduled.IsFailure)
         {
             return rescheduled;
+        }
+
+        // Reassignment is the other door into the same hole: correcting a job
+        // onto another organization's crew is the same forgery as creating one
+        // there.
+        if (!await parties.AssigneeExistsAsync(
+                command.AssigneeId, command.OrganizationId, cancellationToken))
+        {
+            return Result.Failure(JobErrors.AssigneeNotOnTheRoster);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);

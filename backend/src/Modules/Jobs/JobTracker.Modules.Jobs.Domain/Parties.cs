@@ -27,7 +27,7 @@ public sealed class Customer : Entity, ITenantScoped
     public string Email { get; private init; } = string.Empty;
 }
 
-/// <summary>Two reads, no writes, because there is no write path.</summary>
+/// <summary>Reads only, because D-26 gives the rosters no write path.</summary>
 public interface IPartyRepository
 {
     Task<IReadOnlyList<Assignee>> ListAssigneesAsync(
@@ -35,4 +35,16 @@ public interface IPartyRepository
 
     Task<IReadOnlyList<Customer>> ListCustomersAsync(
         Guid organizationId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Membership, not existence. The foreign key already answers "does this
+    /// row exist" and answers it across every tenant; what a command needs to
+    /// know is whether the crew member is on <em>this</em> organization's
+    /// roster.
+    /// </summary>
+    Task<bool> AssigneeExistsAsync(
+        Guid assigneeId, Guid organizationId, CancellationToken cancellationToken = default);
+
+    Task<bool> CustomerExistsAsync(
+        Guid customerId, Guid organizationId, CancellationToken cancellationToken = default);
 }

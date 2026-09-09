@@ -10,12 +10,32 @@ namespace JobTracker.Modules.Jobs.Application.UnitTests;
 public sealed class CreateJobCommandHandlerTests
 {
     private readonly Mock<IJobRepository> _repository = new();
+    private readonly Mock<IPartyRepository> _parties = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
 
     private readonly FixedTimeProvider _time =
         new(new DateTimeOffset(2026, 3, 1, 9, 0, 0, TimeSpan.Zero));
 
-    private CreateJobCommandHandler Handler() => new(_repository.Object, _unitOfWork.Object, _time);
+    private CreateJobCommandHandler Handler() =>
+        new(_repository.Object, _parties.Object, _unitOfWork.Object, _time);
+
+    /// <summary>Both rosters answer yes unless a test says otherwise.</summary>
+    private void Parties(bool assigneeExists = true, bool customerExists = true)
+    {
+        _parties
+            .Setup(p => p.AssigneeExistsAsync(
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(assigneeExists);
+        _parties
+            .Setup(p => p.CustomerExistsAsync(
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(customerExists);
+    }
+
+    public CreateJobCommandHandlerTests() => Parties();
+
+    private void NeverSaved() =>
+        _unitOfWork.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
 
     private static CreateJobCommand AValidCommand() => new(
         "Roof repair", null,
@@ -101,5 +121,50 @@ public sealed class CreateJobCommandHandlerTests
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    // ---- the roster belongs to the tenant ---------------------------------
+
+    [Fact]
+    public async Task A_job_cannot_be_assigned_to_a_crew_member_of_another_organization()
+    {
+        // The gap the query filter cannot close on its own. The foreign key
+        // lives in the database and sees every row; the filter hides the
+        // roster from this tenant's reads but not from the constraint check.
+        // Without this the API creates a job in our organization pointing at
+        // their crew — a corrupt row, and a probe that reveals which
+        // identifiers exist elsewhere.
+        Parties(assigneeExists: false, customerExists: true);
+
+        var result = await Handler().Handle(AValidCommand(), CancellationToken.None);
+
+        result.Error.Should().Be(JobErrors.AssigneeNotOnTheRoster);
+        NeverSaved();
+    }
+
+    [Fact]
+    public async Task A_job_cannot_be_raised_for_a_customer_of_another_organization()
+    {
+        Parties(assigneeExists: true, customerExists: false);
+
+        var result = await Handler().Handle(AValidCommand(), CancellationToken.None);
+
+        result.Error.Should().Be(JobErrors.CustomerNotOnTheRoster);
+        NeverSaved();
+    }
+
+    [Fact]
+    public async Task The_roster_is_checked_before_the_aggregate_is_built()
+    {
+        // Order matters for the message the user sees. A command with both a
+        // past date and a foreign assignee should name the date, because that
+        // is the field the user can see and fix in the form.
+        Parties(assigneeExists: true, customerExists: true);
+
+        var result = await Handler().Handle(
+            AValidCommand() with { ScheduledDate = new DateOnly(2020, 1, 1) },
+            CancellationToken.None);
+
+        result.Error.Should().Be(JobErrors.ScheduledInThePast);
     }
 }

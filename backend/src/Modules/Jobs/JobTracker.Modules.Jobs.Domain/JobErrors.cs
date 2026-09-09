@@ -58,6 +58,21 @@ public static class JobErrors
         "A cancellation reason is required",
         On("Reason", "A cancellation reason is required"));
 
+    /// <summary>
+    /// NFR-1 from the write side. The database's foreign key sees every row
+    /// and would happily accept another organization's crew; only this check
+    /// knows the roster is scoped.
+    /// </summary>
+    public static readonly Error AssigneeNotOnTheRoster = Error.Validation(
+        "job.assignee-not-on-the-roster",
+        "That crew member is not on this organization's roster",
+        On("AssigneeId", "That crew member is not on this organization's roster"));
+
+    public static readonly Error CustomerNotOnTheRoster = Error.Validation(
+        "job.customer-not-on-the-roster",
+        "That customer is not on this organization's roster",
+        On("CustomerId", "That customer is not on this organization's roster"));
+
     public static readonly Error NotFound =
         Error.NotFound("job.not-found", "No job with that identifier");
 }
