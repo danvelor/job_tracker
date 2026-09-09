@@ -21,6 +21,16 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
             table.HasCheckConstraint(
                 "ck_jobs_cancelled_has_reason",
                 "status <> 'Cancelled' OR cancellation_reason IS NOT NULL");
+
+            // Storing the status as text buys readability; without this it
+            // would also buy the freedom to store nonsense, which the ordinal
+            // it replaced at least did not allow.
+            //
+            // Built from the enum rather than from a literal list, so there is
+            // one source of truth. Adding a JobStatus without generating a
+            // migration still fails: the test database carries the constraint
+            // this migration wrote, not the one the enum now describes.
+            table.HasCheckConstraint("ck_jobs_status", StatusIsOneOfTheDefinedValues());
         });
 
         builder.HasKey(job => job.Id);
@@ -93,5 +103,11 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
             .WithMany()
             .HasForeignKey(job => job.CustomerId)
             .OnDelete(DeleteBehavior.Restrict);
+    }
+
+    private static string StatusIsOneOfTheDefinedValues()
+    {
+        var values = string.Join(", ", Enum.GetNames<JobStatus>().Select(name => $"'{name}'"));
+        return $"status in ({values})";
     }
 }
