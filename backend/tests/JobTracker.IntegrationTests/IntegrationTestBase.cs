@@ -1,6 +1,7 @@
 using JobTracker.Common.Infrastructure;
 using JobTracker.Modules.Jobs.Infrastructure;
 using JobTracker.Modules.Jobs.Infrastructure.Configurations;
+using JobTracker.Modules.Jobs.Infrastructure.Outbox;
 using Microsoft.EntityFrameworkCore;
 
 namespace JobTracker.IntegrationTests;
@@ -32,6 +33,9 @@ public abstract class IntegrationTestBase(PostgresFixture postgres) : IAsyncLife
         new DbContextOptionsBuilder<JobsDbContext>()
             .UseNpgsql(postgres.ConnectionString)
             .UseSnakeCaseNamingConvention()
+            // The same registration JobsModule makes. A harness without it
+            // would test a context the application never builds.
+            .AddInterceptors(new InsertOutboxMessagesInterceptor())
             .Options;
 
     public async Task InitializeAsync()

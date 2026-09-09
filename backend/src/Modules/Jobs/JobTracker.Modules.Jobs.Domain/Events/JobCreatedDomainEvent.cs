@@ -8,4 +8,4 @@ namespace JobTracker.Modules.Jobs.Domain.Events;
 /// what makes it the counter-example architecture 4.1 needs.
 /// </summary>
 public sealed record JobCreatedDomainEvent(Guid JobId, Guid AssigneeId, Guid OrganizationId)
-    : IDomainEvent;
+    : DomainEvent;

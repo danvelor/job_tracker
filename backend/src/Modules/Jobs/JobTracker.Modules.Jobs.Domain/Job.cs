@@ -150,7 +150,10 @@ public sealed class Job : AggregateRoot, ITenantScoped
             _photos.Add(new JobPhoto(Guid.NewGuid(), photo.Url, photo.CapturedAt, photo.Caption));
         }
 
-        Raise(new JobCompletedDomainEvent(Id, CustomerId, OrganizationId, completedAt));
+        // StartedAt is non-null here: Complete refuses unless the job is
+        // InProgress, and only Start puts it there.
+        Raise(new JobCompletedDomainEvent(
+            Id, CustomerId, OrganizationId, StartedAt!.Value, completedAt));
 
         return Result.Success();
     }

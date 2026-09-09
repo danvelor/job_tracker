@@ -1,5 +1,6 @@
 using JobTracker.Common.Infrastructure;
 using JobTracker.Modules.Jobs.Domain;
+using JobTracker.Modules.Jobs.Infrastructure.Outbox;
 using Microsoft.EntityFrameworkCore;
 
 namespace JobTracker.Modules.Jobs.Infrastructure;
@@ -18,6 +19,7 @@ public sealed class JobsDbContext(
     public DbSet<Job> Jobs => Set<Job>();
     public DbSet<Assignee> Assignees => Set<Assignee>();
     public DbSet<Customer> Customers => Set<Customer>();
+    internal DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     internal Guid OrganizationId => tenant.OrganizationId;
 

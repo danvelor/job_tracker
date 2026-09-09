@@ -5,7 +5,7 @@ namespace JobTracker.Modules.Jobs.Domain.UnitTests.Common;
 
 public sealed class AggregateRootTests
 {
-    private sealed record ThingHappened(Guid Id) : IDomainEvent;
+    private sealed record ThingHappened(Guid AggregateId) : DomainEvent;
 
     private sealed class Thing() : AggregateRoot(Guid.NewGuid())
     {

@@ -3,6 +3,7 @@ using JobTracker.Common.Application;
 using JobTracker.Common.Application.Behaviors;
 using JobTracker.Modules.Jobs.Application.Jobs.CreateJob;
 using JobTracker.Modules.Jobs.Domain;
+using JobTracker.Modules.Jobs.Infrastructure.Outbox;
 using JobTracker.Modules.Jobs.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,7 +26,11 @@ public static class JobsModule
         services.AddDbContext<JobsDbContext>(options => options
             .UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__EFMigrationsHistory", JobsDbContext.Schema))
-            .UseSnakeCaseNamingConvention());
+            .UseSnakeCaseNamingConvention()
+            // Architecture 4.2. Registered on the context rather than called
+            // by a handler, so no handler can forget and no code path can
+            // change state without its consequences being recorded.
+            .AddInterceptors(new InsertOutboxMessagesInterceptor()));
 
         services.AddScoped<IJobRepository, JobRepository>();
         services.AddScoped<IPartyRepository, PartyRepository>();
