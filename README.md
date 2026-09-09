@@ -68,7 +68,7 @@ That is what lets the browser suite run with neither backend nor database.
 ## Verify it
 
 ```bash
-# Backend: 301 tests — domain, application, architecture, integration
+# Backend: 305 tests — domain, application, architecture, integration
 dotnet test backend/JobTracker.sln
 
 # Frontend: 230 tests, with an 80% coverage gate that fails the run
