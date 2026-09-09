@@ -113,6 +113,8 @@ export function createInMemoryJobsAdapter(): JobsPort {
         startedAt: job.startedAt,
         completedAt: job.completedAt,
         signatureUrl: job.signatureUrl,
+        cancelledAt: job.cancelledAt,
+        cancellationReason: job.cancellationReason,
         photos: job.photos,
       });
     },

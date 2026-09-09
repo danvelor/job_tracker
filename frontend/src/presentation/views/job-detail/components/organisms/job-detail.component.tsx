@@ -1,5 +1,52 @@
+import { getJobSummary } from '@/core/domain/job';
+import type { JobState } from '@/core/domain/job';
 import type { JobDetail } from '@/core/domain/job/job-summary.type';
 import { StatusBadge } from '@/presentation/components/atoms/status-badge.component';
+
+/**
+ * A faithful conversion: every field the state needs is present on JobDetail,
+ * so nothing is invented. That is why the summary lives here and not on the
+ * list row, whose JobSummary carries no timestamps, no signature and no
+ * photos — a row calling getJobSummary would have to fabricate all three.
+ */
+function toState(job: JobDetail): JobState {
+  switch (job.status) {
+    case 'Draft':
+      return { status: 'Draft' };
+
+    case 'Scheduled':
+      return {
+        status: 'Scheduled',
+        scheduledDate: new Date(job.scheduledDate),
+        assigneeId: job.assigneeId,
+      };
+
+    case 'InProgress':
+      return {
+        status: 'InProgress',
+        startedAt: new Date(job.startedAt ?? job.scheduledDate),
+        assigneeId: job.assigneeId,
+        photos: job.photos.map((photo) => photo.url),
+      };
+
+    case 'Completed':
+      return {
+        status: 'Completed',
+        startedAt: new Date(job.startedAt ?? job.scheduledDate),
+        completedAt: new Date(job.completedAt ?? job.scheduledDate),
+        assigneeId: job.assigneeId,
+        photos: job.photos.map((photo) => photo.url),
+        signatureUrl: job.signatureUrl ?? '',
+      };
+
+    case 'Cancelled':
+      return {
+        status: 'Cancelled',
+        cancelledAt: new Date(job.cancelledAt ?? job.scheduledDate),
+        reason: job.cancellationReason ?? '',
+      };
+  }
+}
 
 /** A thin shell: props in, markup out. */
 export function JobDetailView({ job }: { readonly job: JobDetail }) {
@@ -9,6 +56,10 @@ export function JobDetailView({ job }: { readonly job: JobDetail }) {
         {job.title}
       </h1>
       <StatusBadge testId="job-detail-status" status={job.status} />
+
+      <p data-testid="job-detail-summary" className="mt-2 text-sm text-slate-700">
+        {getJobSummary(toState(job))}
+      </p>
 
       <p className="mt-3 text-sm text-slate-600">{job.description ?? 'No description'}</p>
 

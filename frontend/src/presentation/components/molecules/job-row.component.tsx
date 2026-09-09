@@ -1,51 +1,19 @@
 import type { ReactNode } from 'react';
-import { getJobSummary } from '@/core/domain/job';
-import type { JobState } from '@/core/domain/job';
 import type { VisibleJob } from '@/presentation/stores/jobs-ui.store';
 import { Checkbox } from '../atoms/checkbox.component';
 import { StatusBadge } from '../atoms/status-badge.component';
-
-/**
- * A summary carries less than a JobState does, so the timestamps the label
- * does not read are filled from scheduledDate. The label is exact for
- * Scheduled — which is what the test asserts — and approximate elsewhere.
- * Plan 2B reconsiders whether a summary-shaped variant in core/domain is
- * worth it once the mutation slices show which states matter here.
- */
-function toState(job: VisibleJob): JobState {
-  const at = new Date(job.scheduledDate);
-
-  switch (job.status) {
-    case 'Scheduled':
-      return { status: 'Scheduled', scheduledDate: at, assigneeId: job.assigneeId };
-    case 'InProgress':
-      return {
-        status: 'InProgress',
-        startedAt: at,
-        assigneeId: job.assigneeId,
-        photos: [],
-      };
-    case 'Completed':
-      return {
-        status: 'Completed',
-        startedAt: at,
-        completedAt: at,
-        assigneeId: job.assigneeId,
-        photos: [],
-        signatureUrl: '',
-      };
-    case 'Cancelled':
-      return { status: 'Cancelled', cancelledAt: at, reason: '' };
-    case 'Draft':
-      return { status: 'Draft' };
-  }
-}
 
 /**
  * A shared molecule, so it sits below the slices. The actions it renders
  * belong to slices *above* it, and importing one would close the loop
  * components/ -> views/jobs/features/ -> components/. They arrive as a node
  * instead (design A3, architecture 9.4).
+ *
+ * The accessible name is built from what a JobSummary holds. It used to
+ * reconstruct a JobState so it could call getJobSummary, which meant inventing
+ * a startedAt and a signatureUrl the summary does not carry — a label that was
+ * right for Scheduled by accident. getJobSummary lives on /jobs/[id] now,
+ * where the timestamps are real.
  */
 export function JobRow({
   job,
@@ -59,7 +27,7 @@ export function JobRow({
   return (
     <tr
       data-testid={`job-row-${job.id}`}
-      aria-label={getJobSummary(toState(job))}
+      aria-label={`${job.title}, ${job.status}, ${job.scheduledDate}, ${job.assigneeName}`}
       aria-busy={job.isPending}
       className={job.isPending ? 'opacity-60' : undefined}
     >

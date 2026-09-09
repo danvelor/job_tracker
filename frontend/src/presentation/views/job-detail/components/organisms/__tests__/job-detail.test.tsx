@@ -29,6 +29,8 @@ const detail: JobDetail = {
       caption: 'After',
     },
   ],
+  cancelledAt: null,
+  cancellationReason: null,
   photoCount: 1,
 };
 
@@ -68,6 +70,37 @@ describe('JobDetailView', () => {
     render(<JobDetailView job={{ ...detail, photos: [], photoCount: 0 }} />);
 
     expect(screen.getByTestId('job-detail-no-photos')).toBeInTheDocument();
+  });
+
+  it('summarises the job through the domain state machine', () => {
+    render(<JobDetailView job={detail} />);
+
+    // /jobs/[id] holds startedAt, completedAt, the signature and the photos,
+    // so it can build a faithful JobState — which is what makes it the honest
+    // home for getJobSummary. A list row cannot: a summary carries none of
+    // those.
+    expect(screen.getByTestId('job-detail-summary')).toHaveTextContent(
+      'Completed on 2099-03-09, signed',
+    );
+  });
+
+  it('summarises a cancelled job with its reason', () => {
+    render(
+      <JobDetailView
+        job={{
+          ...detail,
+          status: 'Cancelled',
+          completedAt: null,
+          signatureUrl: null,
+          cancelledAt: '2099-03-08T12:00:00.000Z',
+          cancellationReason: 'Customer withdrew',
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('job-detail-summary')).toHaveTextContent(
+      'Cancelled on 2099-03-08: Customer withdrew',
+    );
   });
 
   it('says so when there is no description', () => {

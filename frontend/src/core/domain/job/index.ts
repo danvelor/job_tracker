@@ -6,5 +6,6 @@ export type {
   JobState,
   ResultOf,
 } from './job-state.type';
+export { allowedActionsFor } from './allowed-actions';
 export { transitionJob } from './transition-job';
 export { getJobSummary } from './get-job-summary';

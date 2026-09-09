@@ -47,5 +47,7 @@ export type JobDetail = Omit<JobSummary, 'address'> & {
   readonly startedAt: string | null;
   readonly completedAt: string | null;
   readonly signatureUrl: string | null;
+  readonly cancelledAt: string | null;
+  readonly cancellationReason: string | null;
   readonly photos: readonly JobPhoto[];
 };
