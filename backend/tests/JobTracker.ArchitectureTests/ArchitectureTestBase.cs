@@ -15,6 +15,12 @@ public abstract class ArchitectureTestBase
     protected static readonly Assembly JobsPresentation =
         Modules.Jobs.Presentation.JobsPresentation.Assembly;
 
+    protected static readonly Assembly JobsIntegrationEvents =
+        typeof(Modules.Jobs.IntegrationEvents.JobCompletedIntegrationEvent).Assembly;
+
+    protected static readonly Assembly BillingApplication =
+        typeof(Modules.Billing.Application.BillingOptions).Assembly;
+
     protected static readonly Assembly CommonDomain = typeof(Common.Domain.Entity).Assembly;
 
     /// <summary>

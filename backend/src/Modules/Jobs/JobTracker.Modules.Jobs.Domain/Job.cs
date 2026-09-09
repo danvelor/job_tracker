@@ -76,7 +76,7 @@ public sealed class Job : AggregateRoot, ITenantScoped
             OrganizationId = organizationId,
         };
 
-        job.Raise(new JobCreatedDomainEvent(job.Id, assigneeId, organizationId));
+        job.Raise(new JobCreatedDomainEvent(job.Id, assigneeId) { OrganizationId = organizationId });
 
         return Result.Success(job);
     }
@@ -150,7 +150,12 @@ public sealed class Job : AggregateRoot, ITenantScoped
             _photos.Add(new JobPhoto(Guid.NewGuid(), photo.Url, photo.CapturedAt, photo.Caption));
         }
 
-        Raise(new JobCompletedDomainEvent(Id, CustomerId, OrganizationId, completedAt));
+        // StartedAt is non-null here: Complete refuses unless the job is
+        // InProgress, and only Start puts it there.
+        Raise(new JobCompletedDomainEvent(Id, CustomerId, StartedAt!.Value, completedAt)
+        {
+            OrganizationId = OrganizationId,
+        });
 
         return Result.Success();
     }
@@ -172,7 +177,7 @@ public sealed class Job : AggregateRoot, ITenantScoped
         CancelledAt = cancelledAt;
         CancellationReason = reason;
 
-        Raise(new JobCancelledDomainEvent(Id, reason));
+        Raise(new JobCancelledDomainEvent(Id, reason) { OrganizationId = OrganizationId });
 
         return Result.Success();
     }

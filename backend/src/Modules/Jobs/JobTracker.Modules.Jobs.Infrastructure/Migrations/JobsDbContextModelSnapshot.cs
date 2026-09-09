@@ -200,6 +200,8 @@ namespace JobTracker.Modules.Jobs.Infrastructure.Migrations
 
                     b.ToTable("jobs", "jobs", t =>
                         {
+                            t.HasTrigger("tr_jobs_touch_updated_at");
+
                             t.HasCheckConstraint("ck_jobs_cancelled_has_reason", "status <> 'Cancelled' OR cancellation_reason IS NOT NULL");
 
                             t.HasCheckConstraint("ck_jobs_completed_has_signature", "status <> 'Completed' OR signature_url IS NOT NULL");
@@ -211,7 +213,6 @@ namespace JobTracker.Modules.Jobs.Infrastructure.Migrations
             modelBuilder.Entity("JobTracker.Modules.Jobs.Domain.JobPhoto", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -241,6 +242,111 @@ namespace JobTracker.Modules.Jobs.Infrastructure.Migrations
                         .HasDatabaseName("ix_job_photos_job_id");
 
                     b.ToTable("job_photos", "jobs");
+                });
+
+            modelBuilder.Entity("JobTracker.Modules.Jobs.Domain.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("body");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("FailedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("failed_at");
+
+                    b.Property<string>("FailureReason")
+                        .HasColumnType("text")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("Recipient")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("recipient");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<Guid>("SourceEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_event_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("subject");
+
+                    b.HasKey("Id")
+                        .HasName("pk_notifications");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_notifications_pending")
+                        .HasFilter("status = 'Pending'");
+
+                    b.HasIndex("SourceEventId", "Recipient")
+                        .IsUnique()
+                        .HasDatabaseName("uq_notifications_idempotency");
+
+                    b.ToTable("notifications", "jobs", t =>
+                        {
+                            t.HasCheckConstraint("ck_notifications_sent_has_timestamp", "status <> 'Sent' OR sent_at IS NOT NULL");
+                        });
+                });
+
+            modelBuilder.Entity("JobTracker.Modules.Jobs.Infrastructure.Outbox.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("content");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset>("OccurredOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_on");
+
+                    b.Property<DateTimeOffset?>("ProcessedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_on");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_outbox_messages");
+
+                    b.ToTable("outbox_messages", "jobs");
                 });
 
             modelBuilder.Entity("JobTracker.Modules.Jobs.Domain.Job", b =>

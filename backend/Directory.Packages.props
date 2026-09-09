@@ -23,6 +23,18 @@
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
 
+    <!-- D-20, checked rather than assumed: Hangfire 1.8.25's LICENSE.md reads
+         "multi-licensed under the terms of the licenses listed in this file",
+         LGPL v3 among them, which referencing the unmodified package
+         satisfies. The paid tier is the separate Hangfire.Pro.* packages, and
+         LicenceRules asserts none is loaded. -->
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.0" />
+
+    <PackageVersion Include="Hangfire.Core" Version="1.8.25" />
+    <PackageVersion Include="Hangfire.AspNetCore" Version="1.8.25" />
+    <PackageVersion Include="Hangfire.PostgreSql" Version="1.21.1" />
+
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.1.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.0" />
 

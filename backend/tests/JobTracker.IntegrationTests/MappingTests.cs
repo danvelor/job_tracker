@@ -88,19 +88,18 @@ public sealed class MappingTests(PostgresFixture postgres) : IntegrationTestBase
     }
 
     [Fact]
-    public async Task The_domain_events_are_not_a_mapped_navigation()
+    public void The_domain_events_are_not_a_mapped_navigation()
     {
-        var job = AJob();
-        Context.Jobs.Add(job);
-
-        // The aggregate carries an unpersisted JobCreatedDomainEvent. If EF
-        // treated DomainEvents as a navigation, SaveChanges would try to write
-        // it to a table that has no business existing — the outbox in plan 4 is
+        // If EF treated DomainEvents as a navigation it would try to write an
+        // IDomainEvent to a table that has no business existing. The outbox is
         // what carries an event, and it stores a serialised copy.
-        var save = async () => await Context.SaveChangesAsync();
-
-        await save.Should().NotThrowAsync();
-        job.DomainEvents.Should().NotBeEmpty();
+        //
+        // Asserted against the model rather than by saving and checking the
+        // list: the interceptor now clears the events during SaveChanges, so a
+        // behavioural check here would be measuring the interceptor instead.
+        Context.Model.FindEntityType(typeof(Job))!
+            .FindNavigation(nameof(Job.DomainEvents))
+            .Should().BeNull();
     }
 
     [Fact]

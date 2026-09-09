@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <!-- The shared kernel and nothing else. Billing never references
+         Jobs.Domain: it learns a job completed from a record of primitives,
+         which is the whole point of the boundary (architecture 3.5). -->
+    <ProjectReference Include="..\..\..\Common\JobTracker.Common.Domain\JobTracker.Common.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

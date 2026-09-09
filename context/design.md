@@ -939,7 +939,7 @@ parameter, because accepting one would invite forging it.
 | `POST` | `/api/jobs/{id}/start` | — | `204` | `404`, `409`, `401` |
 | `POST` | `/api/jobs/{id}/complete` | `CompleteJobRequest` | `204` | `400`, `404`, `409`, `401` |
 | `POST` | `/api/jobs/{id}/cancel` | `{ reason }` | `204` | `400`, `404`, `409`, `401` |
-| `PATCH` | `/api/jobs/{id}/schedule` | `{ scheduledDate, assigneeId }` | `204` | `400`, `404`, `409`, `401`. `FR-2`: correcting a Scheduled job. `409` when the job has left Scheduled (`BR-2`) or the date is past (`BR-1`) |
+| `PATCH` | `/api/jobs/{id}/schedule` | `{ scheduledDate, assigneeId }` | `204` | `400`, `404`, `409`, `401`. `FR-2`: correcting a Scheduled job. `409` when the job has left Scheduled (`BR-2`); **`400`** when the date is past — ~~`409`~~, superseded by **D-32**, because the create row gives the same rule a 400 and BR-1 refuses a value rather than a state |
 | `GET` | `/api/assignees` | — | `200` + `[{ id, name }]` | `401`. Read-only roster; there is no `POST` |
 | `GET` | `/api/customers` | — | `200` + `[{ id, name }]` | `401`. Read-only roster; there is no `POST` |
 | `POST` | `/auth/dev-token` | — | `200` + `{ token }` | Registered only in Development |

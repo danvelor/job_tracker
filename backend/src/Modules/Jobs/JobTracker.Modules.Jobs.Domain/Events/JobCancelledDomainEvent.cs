@@ -7,4 +7,4 @@ namespace JobTracker.Modules.Jobs.Domain.Events;
 /// It is the second internal-only event, and the pair with JobCompleted is what
 /// makes the domain-versus-integration distinction demonstrable.
 /// </summary>
-public sealed record JobCancelledDomainEvent(Guid JobId, string Reason) : IDomainEvent;
+public sealed record JobCancelledDomainEvent(Guid JobId, string Reason) : DomainEvent;

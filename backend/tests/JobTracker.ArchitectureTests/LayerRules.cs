@@ -171,4 +171,70 @@ public sealed class LayerRules : ArchitectureTestBase
 
         ShouldHold(subject.ShouldNot().HaveDependencyOn("Microsoft.AspNetCore"), subject);
     }
+
+    [Fact]
+    public void The_contract_project_can_see_nothing_at_all()
+    {
+        // Worth more than several narrower rules: a project with no references
+        // cannot leak a domain type, an EF attribute or a MediatR marker into
+        // the contract Billing compiles against.
+        ProjectReferencesOf("Modules/Jobs/JobTracker.Modules.Jobs.IntegrationEvents")
+            .Should().BeEmpty();
+    }
+
+    [Fact]
+    public void The_contract_carries_primitives_only()
+    {
+        // The rule above stops a reference; this stops a type from this
+        // assembly leaking into a contract member — a nested record would
+        // compile and would still be a shape consumers must version with us.
+        var members = Types.InAssembly(JobsIntegrationEvents)
+            .That().AreClasses().GetTypes()
+            .SelectMany(type => type.GetProperties())
+            .Select(property => property.PropertyType)
+            .Where(type => !type.IsPrimitive
+                           && type != typeof(string)
+                           && type != typeof(Guid)
+                           && type != typeof(decimal)
+                           && type != typeof(DateTimeOffset)
+                           && type != typeof(DateOnly)
+                           && type != typeof(Type))
+            .Select(type => type.Name)
+            .ToList();
+
+        members.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Billing_cannot_see_the_Jobs_domain()
+    {
+        // Architecture 3.5's whole claim, and what stops it from being an
+        // aspiration. Billing learns a job completed from a record of
+        // primitives; anything more would be the coupling the boundary exists
+        // to prevent.
+        var references = ProjectReferencesOf("Modules/Billing/JobTracker.Modules.Billing.Application");
+
+        references.Should().Contain("JobTracker.Modules.Jobs.IntegrationEvents");
+        references.Should().NotContain("JobTracker.Modules.Jobs.Domain");
+        references.Should().NotContain("JobTracker.Modules.Jobs.Application");
+        references.Should().NotContain("JobTracker.Modules.Jobs.Infrastructure");
+    }
+
+    [Fact]
+    public void Billings_domain_sees_only_the_shared_kernel()
+    {
+        ProjectReferencesOf("Modules/Billing/JobTracker.Modules.Billing.Domain")
+            .Should().BeEquivalentTo(["JobTracker.Common.Domain"]);
+    }
+
+    [Fact]
+    public void Billing_does_not_use_a_Jobs_type_even_transitively()
+    {
+        // The project graph forbids the reference; this catches a type that
+        // arrived some other way — through the shared kernel, or through a
+        // package both happen to pull.
+        var subject = Types.InAssembly(BillingApplication);
+
+        ShouldHold(subject.ShouldNot().HaveDependencyOn("JobTracker.Modules.Jobs.Domain"), subject);
+    }
 }

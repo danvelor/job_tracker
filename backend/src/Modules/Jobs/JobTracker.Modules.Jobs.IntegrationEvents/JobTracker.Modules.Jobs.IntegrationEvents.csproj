@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- No references, on purpose. A contract project that cannot see anything
+       cannot leak anything, and an architecture rule asserts the emptiness. -->
+
+</Project>

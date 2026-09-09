@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Modules\Jobs\JobTracker.Modules.Jobs.Infrastructure\JobTracker.Modules.Jobs.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Api\JobTracker.Api\JobTracker.Api.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Billing\JobTracker.Modules.Billing.Infrastructure\JobTracker.Modules.Billing.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

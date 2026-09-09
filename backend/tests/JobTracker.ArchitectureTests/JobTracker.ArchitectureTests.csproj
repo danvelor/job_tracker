@@ -23,6 +23,8 @@
          Infrastructure. -->
     <ProjectReference Include="..\..\src\Modules\Jobs\JobTracker.Modules.Jobs.Infrastructure\JobTracker.Modules.Jobs.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\Jobs\JobTracker.Modules.Jobs.Presentation\JobTracker.Modules.Jobs.Presentation.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Jobs\JobTracker.Modules.Jobs.IntegrationEvents\JobTracker.Modules.Jobs.IntegrationEvents.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Billing\JobTracker.Modules.Billing.Infrastructure\JobTracker.Modules.Billing.Infrastructure.csproj" />
   </ItemGroup>
 
 
@@ -31,6 +33,7 @@
     <PackageReference Include="Moq" />
     <PackageReference Include="NetArchTest.Rules" />
     <PackageReference Include="MediatR" />
+    <PackageReference Include="Hangfire.Core" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="EFCore.NamingConventions" />
