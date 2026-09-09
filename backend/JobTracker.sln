@@ -43,6 +43,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Api", "Api", "{49753BCA-7F8
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JobTracker.Api", "src\Api\JobTracker.Api\JobTracker.Api.csproj", "{0949376D-5ADC-402E-9E83-A632A614E6B8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JobTracker.Modules.Jobs.IntegrationEvents", "src\Modules\Jobs\JobTracker.Modules.Jobs.IntegrationEvents\JobTracker.Modules.Jobs.IntegrationEvents.csproj", "{FED7F781-EBC4-445D-8342-B63AF30D7D59}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -108,6 +110,10 @@ Global
 		{0949376D-5ADC-402E-9E83-A632A614E6B8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0949376D-5ADC-402E-9E83-A632A614E6B8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0949376D-5ADC-402E-9E83-A632A614E6B8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FED7F781-EBC4-445D-8342-B63AF30D7D59}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FED7F781-EBC4-445D-8342-B63AF30D7D59}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FED7F781-EBC4-445D-8342-B63AF30D7D59}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FED7F781-EBC4-445D-8342-B63AF30D7D59}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{E5472584-FCCE-4E88-B1B8-5EEE9AC9E021} = {5FDADBFE-037B-4182-86FA-6E4A421A8B61}
@@ -128,5 +134,6 @@ Global
 		{7715388B-EE28-44F3-B624-245F28B050AF} = {2B361B1B-CE7D-44B5-B77A-77149596DCAE}
 		{49753BCA-7F8A-4829-8A1F-5D52EAE45E60} = {5FDADBFE-037B-4182-86FA-6E4A421A8B61}
 		{0949376D-5ADC-402E-9E83-A632A614E6B8} = {49753BCA-7F8A-4829-8A1F-5D52EAE45E60}
+		{FED7F781-EBC4-445D-8342-B63AF30D7D59} = {2B361B1B-CE7D-44B5-B77A-77149596DCAE}
 	EndGlobalSection
 EndGlobal

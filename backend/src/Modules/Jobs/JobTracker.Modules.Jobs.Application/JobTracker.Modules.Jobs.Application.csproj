@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\JobTracker.Modules.Jobs.Domain\JobTracker.Modules.Jobs.Domain.csproj" />
+    <ProjectReference Include="..\JobTracker.Modules.Jobs.IntegrationEvents\JobTracker.Modules.Jobs.IntegrationEvents.csproj" />
     <ProjectReference Include="..\..\..\Common\JobTracker.Common.Application\JobTracker.Common.Application.csproj" />
   </ItemGroup>
 

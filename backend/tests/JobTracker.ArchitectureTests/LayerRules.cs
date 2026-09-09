@@ -171,4 +171,37 @@ public sealed class LayerRules : ArchitectureTestBase
 
         ShouldHold(subject.ShouldNot().HaveDependencyOn("Microsoft.AspNetCore"), subject);
     }
+
+    [Fact]
+    public void The_contract_project_can_see_nothing_at_all()
+    {
+        // Worth more than several narrower rules: a project with no references
+        // cannot leak a domain type, an EF attribute or a MediatR marker into
+        // the contract Billing compiles against.
+        ProjectReferencesOf("Modules/Jobs/JobTracker.Modules.Jobs.IntegrationEvents")
+            .Should().BeEmpty();
+    }
+
+    [Fact]
+    public void The_contract_carries_primitives_only()
+    {
+        // The rule above stops a reference; this stops a type from this
+        // assembly leaking into a contract member — a nested record would
+        // compile and would still be a shape consumers must version with us.
+        var members = Types.InAssembly(JobsIntegrationEvents)
+            .That().AreClasses().GetTypes()
+            .SelectMany(type => type.GetProperties())
+            .Select(property => property.PropertyType)
+            .Where(type => !type.IsPrimitive
+                           && type != typeof(string)
+                           && type != typeof(Guid)
+                           && type != typeof(decimal)
+                           && type != typeof(DateTimeOffset)
+                           && type != typeof(DateOnly)
+                           && type != typeof(Type))
+            .Select(type => type.Name)
+            .ToList();
+
+        members.Should().BeEmpty();
+    }
 }

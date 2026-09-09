@@ -1,6 +1,7 @@
 using FluentValidation;
 using JobTracker.Common.Application;
 using JobTracker.Common.Application.Behaviors;
+using JobTracker.Common.Infrastructure;
 using JobTracker.Modules.Jobs.Application.Jobs.CreateJob;
 using JobTracker.Modules.Jobs.Domain;
 using JobTracker.Modules.Jobs.Application.Abstractions;
@@ -47,6 +48,7 @@ public static class JobsModule
         services.AddScoped<INotificationSender, LoggingNotificationSender>();
         services.AddScoped<IBackgroundQueue, HangfireBackgroundQueue>();
         services.AddScoped<MediatorJobRunner>();
+        services.AddScoped<IEventBus, EventBus>();
 
         services.AddMediatR(configuration =>
         {

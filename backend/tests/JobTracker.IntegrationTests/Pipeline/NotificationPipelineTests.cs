@@ -4,6 +4,7 @@ using JobTracker.Modules.Jobs.Application.Abstractions;
 using JobTracker.Modules.Jobs.Application.Notifications;
 using JobTracker.Modules.Jobs.Domain;
 using JobTracker.Modules.Jobs.Domain.Events;
+using JobTracker.Modules.Jobs.IntegrationEvents;
 using JobTracker.Modules.Jobs.Infrastructure;
 using JobTracker.Modules.Jobs.Infrastructure.Notifications;
 using JobTracker.Modules.Jobs.Infrastructure.Outbox;
@@ -56,6 +57,20 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
 
         await processor.DrainAsync(default);
         Context.ChangeTracker.Clear();
+    }
+
+    /// <summary>
+    /// Reloads before mutating. The drain clears the change tracker, so the
+    /// instance Seed returned is detached by then and a Complete on it would
+    /// be saved by nobody — which is how the first version of these tests
+    /// asserted against an event that was never raised.
+    /// </summary>
+    private async Task CompleteTheJob(Guid id)
+    {
+        var job = await new JobRepository(Context).GetByIdAsync(id);
+        job!.Start(Now.AddHours(1));
+        job.Complete(Now.AddHours(6), "sig", []);
+        await Context.SaveChangesAsync();
     }
 
     private Task ResetProcessedOn() =>
@@ -264,5 +279,128 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
             notification is JobCreatedDomainEvent created
                 ? handler.Handle(created, cancellationToken)
                 : Task.CompletedTask;
+    }
+
+    // ---- FR-10 -----------------------------------------------------------
+
+    [Fact]
+    public async Task Completing_a_job_notifies_the_customer_at_their_email()
+    {
+        var job = Seed();
+        await Context.SaveChangesAsync();
+        await Drain();
+        await CompleteTheJob(job.Id);
+
+        await DrainCompletions();
+
+        // The email, not the name: this one leaves the building.
+        var customer = await Context.Notifications.AsNoTracking()
+            .SingleAsync(notification => notification.Recipient.Contains("@"));
+        customer.Recipient.Should().Be("ops@acme.test");
+    }
+
+    [Fact]
+    public async Task The_crew_notification_and_the_customer_notification_coexist()
+    {
+        var job = Seed();
+        await Context.SaveChangesAsync();
+        await Drain();
+        await CompleteTheJob(job.Id);
+
+        await DrainCompletions();
+
+        // Two rows, two recipients, one unique constraint. If the key were the
+        // source event alone the second would be rejected as a duplicate.
+        (await Context.Notifications.CountAsync()).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task A_replayed_completion_does_not_notify_the_customer_twice()
+    {
+        var job = Seed();
+        await Context.SaveChangesAsync();
+        await Drain();
+        await CompleteTheJob(job.Id);
+        await DrainCompletions();
+        await ResetProcessedOn();
+
+        await DrainCompletions();
+
+        (await Context.Notifications.CountAsync()).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Completing_a_job_publishes_the_contract_rather_than_the_domain_event()
+    {
+        var job = Seed();
+        await Context.SaveChangesAsync();
+        await Drain();
+        await CompleteTheJob(job.Id);
+        var bus = new RecordingBus();
+
+        await DrainCompletions(bus);
+
+        // The whole of architecture 4.1: what crosses the boundary is a record
+        // of primitives, and Billing compiles against that and nothing else.
+        var published = bus.Published.Should().ContainSingle().Subject;
+        published.JobId.Should().Be(job.Id);
+        published.StartedAt.Should().Be(Now.AddHours(1));
+        published.CompletedAt.Should().Be(Now.AddHours(6));
+    }
+
+    private async Task DrainCompletions(IEventBus? bus = null)
+    {
+        var unitOfWork = new UnitOfWork(Context);
+        var notifications = new NotificationRepository(Context);
+
+        var customer = new NotifyCustomerOnJobCompletedHandler(
+            notifications, new PartyRepository(Context), new JobRepository(Context),
+            _queue, unitOfWork, TimeProvider.System);
+
+        var publish = new PublishJobCompletedHandler(bus ?? new RecordingBus());
+
+        var processor = new OutboxProcessor(
+            Context, new CompletionPublisher(customer, publish), TimeProvider.System,
+            Options.Create(new OutboxOptions()));
+
+        await processor.DrainAsync(default);
+        Context.ChangeTracker.Clear();
+    }
+
+    private sealed class RecordingBus : IEventBus
+    {
+        private readonly List<JobCompletedIntegrationEvent> _published = [];
+
+        public IReadOnlyList<JobCompletedIntegrationEvent> Published => _published;
+
+        public Task PublishAsync<T>(T integrationEvent, CancellationToken cancellationToken = default)
+            where T : class
+        {
+            if (integrationEvent is JobCompletedIntegrationEvent completed)
+            {
+                _published.Add(completed);
+            }
+
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class CompletionPublisher(
+        INotificationHandler<JobCompletedDomainEvent> customer,
+        INotificationHandler<JobCompletedDomainEvent> publish) : IPublisher
+    {
+        public Task Publish(object notification, CancellationToken cancellationToken = default) =>
+            Publish((INotification)notification, cancellationToken);
+
+        public async Task Publish<TNotification>(
+            TNotification notification, CancellationToken cancellationToken = default)
+            where TNotification : INotification
+        {
+            if (notification is JobCompletedDomainEvent completed)
+            {
+                await customer.Handle(completed, cancellationToken);
+                await publish.Handle(completed, cancellationToken);
+            }
+        }
     }
 }

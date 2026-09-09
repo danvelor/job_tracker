@@ -23,6 +23,7 @@
          Infrastructure. -->
     <ProjectReference Include="..\..\src\Modules\Jobs\JobTracker.Modules.Jobs.Infrastructure\JobTracker.Modules.Jobs.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\Jobs\JobTracker.Modules.Jobs.Presentation\JobTracker.Modules.Jobs.Presentation.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Jobs\JobTracker.Modules.Jobs.IntegrationEvents\JobTracker.Modules.Jobs.IntegrationEvents.csproj" />
   </ItemGroup>
 
 
