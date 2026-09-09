@@ -1,4 +1,5 @@
 using JobTracker.Common.Infrastructure;
+using JobTracker.Modules.Jobs.Application.Abstractions;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -19,6 +20,7 @@ public sealed class OutboxProcessor(
     JobsDbContext context,
     IPublisher publisher,
     ITenantContextSetter tenant,
+    IBackgroundQueue queue,
     TimeProvider time,
     IOptions<OutboxOptions> options)
 {
@@ -44,6 +46,11 @@ public sealed class OutboxProcessor(
 
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+
+        // After the commit, never before. Work queued by a handler reads rows
+        // this transaction wrote, and until it commits no other connection can
+        // see them.
+        queue.Flush();
     }
 
     private async Task PublishOne(OutboxMessage message, CancellationToken cancellationToken)

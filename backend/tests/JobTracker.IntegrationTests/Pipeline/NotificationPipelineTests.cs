@@ -52,7 +52,7 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
             TimeProvider.System);
 
         var processor = new OutboxProcessor(
-            Context, new SingleHandlerPublisher(handler), Tenant, TimeProvider.System,
+            Context, new SingleHandlerPublisher(handler), Tenant, _queue, TimeProvider.System,
             Options.Create(new OutboxOptions()));
 
         await processor.DrainAsync(default);
@@ -248,8 +248,14 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
 
         public IReadOnlyList<SendNotificationCommand> Sent => _queued;
 
-        public void Enqueue<TRequest>(TRequest request) where TRequest : notnull =>
+        public void Enqueue<TRequest>(TRequest request, Guid organizationId)
+            where TRequest : notnull =>
             _queued.Add((SendNotificationCommand)(object)request);
+
+        // The test decides when a send happens, so nothing needs dispatching
+        // here. The processor still calls it, which keeps the production
+        // ordering exercised rather than assumed.
+        public void Flush() { }
 
         public IEnumerable<SendNotificationCommand> Drain() => _queued.ToList();
     }
@@ -360,7 +366,7 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
         var publish = new PublishJobCompletedHandler(bus ?? new RecordingBus());
 
         var processor = new OutboxProcessor(
-            Context, new CompletionPublisher(customer, publish), Tenant, TimeProvider.System,
+            Context, new CompletionPublisher(customer, publish), Tenant, _queue, TimeProvider.System,
             Options.Create(new OutboxOptions()));
 
         await processor.DrainAsync(default);

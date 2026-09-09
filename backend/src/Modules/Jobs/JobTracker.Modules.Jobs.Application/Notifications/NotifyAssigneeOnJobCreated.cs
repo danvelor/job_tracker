@@ -61,6 +61,8 @@ internal sealed class NotifyAssigneeOnJobCreatedHandler(
 
         // Enqueued after the commit, not before: a job that started before the
         // row existed would look the notification up and find nothing.
-        queue.Enqueue(new SendNotificationCommand(notification.Value.Id));
+        queue.Enqueue(
+            new SendNotificationCommand(notification.Value.Id),
+            domainEvent.OrganizationId);
     }
 }

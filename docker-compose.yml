@@ -1,0 +1,80 @@
+# The whole stack, for a reviewer who runs `docker compose up --build` and
+# nothing else: no credentials to obtain, no accounts to create, no migration
+# step to remember (NFR-7).
+#
+# Three services, and deliberately not four. An earlier draft had MailHog as an
+# inspectable SMTP sink; D-08 dropped it, because delivery is simulated and
+# `jobs.notifications` is better evidence than an inbox — a test can assert on a
+# table.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: jobtracker
+      POSTGRES_USER: jobtracker
+      POSTGRES_PASSWORD: jobtracker
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      # Published so the smoke run can assert on the two consequences that
+      # never reach the interface — the invoice and the notifications
+      # (architecture 8.1).
+      - "5432:5432"
+    healthcheck:
+      # A started container is not an accepting one. Migrations against a
+      # database still recovering fail in a way that reads like a code fault,
+      # which is a bad first impression to hand a reviewer.
+      test: ["CMD-SHELL", "pg_isready -U jobtracker -d jobtracker"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  backend:
+    build:
+      context: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Database: Host=postgres;Port=5432;Database=jobtracker;Username=jobtracker;Password=jobtracker
+      # Committed on purpose. It signs tokens for a local database of fictional
+      # rosters and there is nothing here to protect. A deployed environment
+      # supplies Jwt__Key from its own environment, and appsettings.json carries
+      # no key at all — so a missing one fails loudly rather than falling back
+      # to this.
+      Jwt__Key: compose-development-signing-key-at-least-32-bytes-long
+      Database__MigrateOnStartup: "true"
+      Outbox__PollSeconds: "5"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8080/health || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      backend:
+        # service_healthy, not service_started. Architecture 10.1 asks only for
+        # a dependency, but a frontend that starts against a backend still
+        # applying migrations renders an error page — and that page is the
+        # first thing a reviewer sees.
+        condition: service_healthy
+    environment:
+      # The service name, not localhost. This fetch runs inside the network,
+      # from the Next server; the browser reaches the frontend at localhost:3000
+      # and never calls the API directly (D-29).
+      JOBTRACKER_API_URL: http://backend:8080
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres-data:

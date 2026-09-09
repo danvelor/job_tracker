@@ -56,6 +56,8 @@ builder.Services.AddBillingModule(
     ?? throw new InvalidOperationException("ConnectionStrings:Database is required."),
     builder.Configuration);
 
+builder.Services.AddSingleton<DatabaseMigrator>();
+
 builder.Services.AddEndpoints(JobsPresentation.Assembly);
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
@@ -73,6 +75,20 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapEndpoints();
+
+// Anonymous and unmetered: Compose polls it before the container has any
+// credentials, and a healthcheck that needed a token would never turn the
+// container healthy.
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
+    .AllowAnonymous()
+    .WithTags("Diagnostics");
+
+// Before the first request is served, and only when configuration asks. A test
+// host that migrated on every start would fight its own fixture.
+if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
+    await app.Services.GetRequiredService<DatabaseMigrator>().MigrateAsync(default);
+}
 
 app.Services.UseJobsModule();
 

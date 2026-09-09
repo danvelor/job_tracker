@@ -57,6 +57,8 @@ internal sealed class NotifyCustomerOnJobCompletedHandler(
         await notifications.AddAsync(notification.Value, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        queue.Enqueue(new SendNotificationCommand(notification.Value.Id));
+        queue.Enqueue(
+            new SendNotificationCommand(notification.Value.Id),
+            domainEvent.OrganizationId);
     }
 }
