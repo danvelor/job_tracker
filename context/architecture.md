@@ -1177,7 +1177,7 @@ accounts, no manual migration step (`NFR-7`).
 | `frontend` | install, lint, `tsc --noEmit`, Jest with `coverageThreshold` enforced |
 | `e2e` | build frontend with the in-memory adapter, run Playwright, upload failure screenshots |
 | `smoke` | `docker compose up --wait`, run the smoke spec against the HTTP adapter, assert steps 4 and 9 against Postgres, tear down |
-| `images` | build both Dockerfiles to prove the Compose stack still builds |
+| ~~`images`~~ | Merged into `smoke`, which brings the stack up with `--build` and so fails if either Dockerfile does. A separate job would build the same two images a second time for the same information |
 
 `tsc --noEmit` is a separate step from Jest for the reason given in section 8.
 

@@ -1,0 +1,178 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A push that supersedes an in-flight run cancels it. Two runs of the same
+# branch tell you about two different trees, and only the newer one matters.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # The fast jobs. They run in parallel and a typo fails in a minute rather
+  # than after the Docker-dependent ones have finished.
+  # ---------------------------------------------------------------------------
+
+  backend:
+    name: Backend — build and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          # global.json pins the SDK, so this reads rather than decides.
+          global-json-file: backend/global.json
+
+      - run: dotnet restore backend/JobTracker.sln
+
+      - name: Build
+        # Warnings are errors here because they are errors locally
+        # (Directory.Build.props). A CI that was more permissive than the
+        # developer's machine would be a CI nobody trusts.
+        run: dotnet build backend/JobTracker.sln --no-restore --configuration Release
+
+      - name: Unit and architecture tests
+        # Everything except the integration suite, which needs Docker and gets
+        # a job of its own so its cost is visible rather than buried.
+        run: |
+          dotnet test backend/tests/JobTracker.Modules.Jobs.Domain.UnitTests --no-build --configuration Release
+          dotnet test backend/tests/JobTracker.Modules.Jobs.Application.UnitTests --no-build --configuration Release
+          dotnet test backend/tests/JobTracker.Modules.Billing.UnitTests --no-build --configuration Release
+          dotnet test backend/tests/JobTracker.Common.Presentation.UnitTests --no-build --configuration Release
+          dotnet test backend/tests/JobTracker.ArchitectureTests --no-build --configuration Release
+
+  frontend:
+    name: Frontend — lint, types and Jest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+        working-directory: frontend
+
+      - run: npm run lint
+        working-directory: frontend
+
+      - name: Type check
+        # Its own step, never folded into the test run: expect-type assertions
+        # fail at compile time, so a broken type test leaves Jest green.
+        run: npm run typecheck
+        working-directory: frontend
+
+      - name: Jest with the coverage gate
+        # coverageThreshold in jest.config fails the run below 80%. Collecting
+        # coverage and printing it changes nothing about whether the tests are
+        # good; failing the build when it drops is the version with teeth.
+        run: npm run test:coverage
+        working-directory: frontend
+
+  # ---------------------------------------------------------------------------
+  # The jobs that need Docker.
+  # ---------------------------------------------------------------------------
+
+  integration:
+    name: Backend — integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: backend/global.json
+
+      # No services: block. Testcontainers starts the database itself, which is
+      # what lets the same command run here and on a laptop.
+      - name: Integration tests
+        run: dotnet test backend/tests/JobTracker.IntegrationTests --configuration Release
+
+  e2e:
+    name: Frontend — Playwright against the in-memory adapter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+        working-directory: frontend
+
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      # No backend and no database: D-01's whole point is that the two halves
+      # of the project fail independently rather than together.
+      - run: npm run test:e2e
+        working-directory: frontend
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failures
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+          retention-days: 7
+
+  smoke:
+    name: The nine steps against the Compose stack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+        working-directory: frontend
+
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: Bring up the stack
+        # --wait, so the step fails here if a healthcheck never passes rather
+        # than failing later as a confusing timeout in the browser.
+        run: docker compose up --build --wait
+
+      - name: The acceptance walkthrough
+        # This is the definition of done (architecture 8.1). If it fails, the
+        # work is not finished — the fix is the system, not the test.
+        run: npm run test:smoke
+        working-directory: frontend
+
+      - if: failure()
+        name: What the stack was doing
+        run: docker compose logs --no-color --tail 200
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-failures
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+          retention-days: 7
+
+      - if: always()
+        run: docker compose down -v
