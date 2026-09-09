@@ -18,6 +18,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Modules\Jobs\JobTracker.Modules.Jobs.Application\JobTracker.Modules.Jobs.Application.csproj" />
     <ProjectReference Include="..\..\src\Common\JobTracker.Common.Application\JobTracker.Common.Application.csproj" />
+    <!-- The one place a test crosses a layer boundary on purpose: the rule in
+         TenantRules is *about* the EF model, and the model only exists in
+         Infrastructure. -->
+    <ProjectReference Include="..\..\src\Modules\Jobs\JobTracker.Modules.Jobs.Infrastructure\JobTracker.Modules.Jobs.Infrastructure.csproj" />
   </ItemGroup>
 
 
@@ -26,5 +30,8 @@
     <PackageReference Include="Moq" />
     <PackageReference Include="NetArchTest.Rules" />
     <PackageReference Include="MediatR" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="EFCore.NamingConventions" />
   </ItemGroup>
 </Project>
