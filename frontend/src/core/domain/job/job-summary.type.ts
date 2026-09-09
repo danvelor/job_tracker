@@ -16,7 +16,14 @@ export type JobSummary = {
   readonly id: string;
   readonly title: string;
   readonly status: JobStatus;
-  readonly scheduledDate: string;
+  /**
+   * Null for a job with no date. `Draft` is the state that has none, and D-14
+   * makes it unreachable through the API — but the column is nullable and the
+   * alternative is for the HTTP adapter to invent a date to satisfy this type.
+   * A fabricated label is a placeholder a reader understands; a fabricated date
+   * is something a scheduler acts on.
+   */
+  readonly scheduledDate: string | null;
   readonly assigneeId: string;
   readonly assigneeName: string;
   readonly address: {

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <!-- The composition root is the one project allowed to reference every
+         layer. That is what lets the inner ones reference none of it. -->
+    <ProjectReference Include="..\..\Common\JobTracker.Common.Presentation\JobTracker.Common.Presentation.csproj" />
+    <ProjectReference Include="..\..\Modules\Jobs\JobTracker.Modules.Jobs.Infrastructure\JobTracker.Modules.Jobs.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Jobs\JobTracker.Modules.Jobs.Presentation\JobTracker.Modules.Jobs.Presentation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="JobTracker.IntegrationTests" />
+  </ItemGroup>
+
+</Project>

@@ -23,6 +23,7 @@ public sealed class TransitionCommandHandlerTests
     private static readonly Guid Organization = Guid.NewGuid();
 
     private readonly Mock<IJobRepository> _repository = new();
+    private readonly Mock<IPartyRepository> _parties = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly FixedTimeProvider _time = new(Now);
 
@@ -38,6 +39,13 @@ public sealed class TransitionCommandHandlerTests
         job.Start(Now.AddHours(1));
         return job;
     }
+
+    /// <summary>The roster answers yes unless a test says otherwise.</summary>
+    public TransitionCommandHandlerTests() =>
+        _parties
+            .Setup(p => p.AssigneeExistsAsync(
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
     private void Returns(Job? job) =>
         _repository
@@ -179,7 +187,7 @@ public sealed class TransitionCommandHandlerTests
     {
         var job = AScheduledJob();
         Returns(job);
-        var handler = new RescheduleJobCommandHandler(_repository.Object, _unitOfWork.Object, _time);
+        var handler = new RescheduleJobCommandHandler(_repository.Object, _parties.Object, _unitOfWork.Object, _time);
         var later = new DateOnly(2026, 4, 1);
 
         var result = await handler.Handle(
@@ -194,13 +202,36 @@ public sealed class TransitionCommandHandlerTests
     public async Task RescheduleJob_surfaces_BR_1_from_the_aggregate()
     {
         Returns(AScheduledJob());
-        var handler = new RescheduleJobCommandHandler(_repository.Object, _unitOfWork.Object, _time);
+        var handler = new RescheduleJobCommandHandler(_repository.Object, _parties.Object, _unitOfWork.Object, _time);
 
         var result = await handler.Handle(
             new RescheduleJobCommand(JobId, Organization, new DateOnly(2020, 1, 1), Guid.NewGuid()),
             default);
 
         result.Error.Should().Be(JobErrors.ScheduledInThePast);
+        NeverSaved();
+    }
+
+
+    [Fact]
+    public async Task RescheduleJob_refuses_a_crew_member_from_another_organization()
+    {
+        Returns(AScheduledJob());
+        _parties
+            .Setup(p => p.AssigneeExistsAsync(
+                It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        var handler = new RescheduleJobCommandHandler(
+            _repository.Object, _parties.Object, _unitOfWork.Object, _time);
+
+        var result = await handler.Handle(
+            new RescheduleJobCommand(JobId, Organization, new DateOnly(2026, 4, 1), Guid.NewGuid()),
+            default);
+
+        // Reassignment is the other door into the same hole as creation: the
+        // foreign key sees every roster row, and only the tenant-filtered
+        // lookup knows which ones are ours.
+        result.Error.Should().Be(JobErrors.AssigneeNotOnTheRoster);
         NeverSaved();
     }
 

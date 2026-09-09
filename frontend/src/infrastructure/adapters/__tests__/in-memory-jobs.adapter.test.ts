@@ -82,7 +82,10 @@ describe('InMemoryJobsAdapter', () => {
     expect(page.items.length).toBeGreaterThan(0);
     expect(
       page.items.every(
-        (job) => job.scheduledDate >= '2099-03-13' && job.scheduledDate <= '2099-03-14',
+        (job) =>
+          job.scheduledDate !== null &&
+          job.scheduledDate >= '2099-03-13' &&
+          job.scheduledDate <= '2099-03-14',
       ),
     ).toBe(true);
   });

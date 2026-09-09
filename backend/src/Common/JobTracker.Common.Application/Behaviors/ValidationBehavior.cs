@@ -35,10 +35,18 @@ public sealed class ValidationBehavior<TRequest, TResponse>(
 
         // Every broken rule, not the first: telling someone one problem at a
         // time hides the way forward (design A5 point 3 makes the same case
-        // for the create form).
+        // for the create form). That applies within a field as much as across
+        // them, so the grouping keeps every message rather than the last.
+        var fieldErrors = failures
+            .GroupBy(failure => failure.PropertyName)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(failure => failure.ErrorMessage).ToArray());
+
         var error = Error.Validation(
             "request.validation",
-            string.Join("; ", failures.Select(failure => failure.ErrorMessage)));
+            string.Join("; ", failures.Select(failure => failure.ErrorMessage)),
+            fieldErrors);
 
         return CreateFailure(error);
     }

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- No reference to Jobs.Infrastructure. An endpoint sends a message and
+         never touches a DbContext; an architecture rule asserts it. -->
+    <ProjectReference Include="..\JobTracker.Modules.Jobs.Application\JobTracker.Modules.Jobs.Application.csproj" />
+    <ProjectReference Include="..\..\..\Common\JobTracker.Common.Presentation\JobTracker.Common.Presentation.csproj" />
+    <ProjectReference Include="..\..\..\Common\JobTracker.Common.Infrastructure\JobTracker.Common.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The Web SDK declares these implicitly; a class library does not, and
+         every endpoint would otherwise open with the same four usings. -->
+    <Using Include="Microsoft.AspNetCore.Builder" />
+    <Using Include="Microsoft.AspNetCore.Http" />
+    <Using Include="Microsoft.AspNetCore.Routing" />
+  </ItemGroup>
+
+</Project>

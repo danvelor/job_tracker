@@ -261,4 +261,41 @@ public sealed class JobTests
         typeof(Job).GetMethods().Select(method => method.Name)
             .Should().NotContain("AddPhoto");
     }
+
+    // ---- errors name the input that failed --------------------------------
+
+    [Fact]
+    public void A_refusal_names_the_field_the_caller_must_fix()
+    {
+        // Design A5 point 3: the form lights up the field that failed rather
+        // than showing a banner. The aggregate is what knows which value was
+        // wrong, and the field name is a contract with the client in the same
+        // way the error code already is — so it belongs on the Error and not
+        // in a translation table somewhere in Presentation.
+        JobErrors.ScheduledInThePast.FieldErrors.Should().ContainKey("ScheduledDate");
+        JobErrors.TitleRequired.FieldErrors.Should().ContainKey("Title");
+        JobErrors.SignatureRequired.FieldErrors.Should().ContainKey("SignatureUrl");
+        JobErrors.ReasonRequired.FieldErrors.Should().ContainKey("Reason");
+    }
+
+    [Fact]
+    public void Every_named_field_matches_a_property_the_client_actually_sends()
+    {
+        // A field name nothing on the wire is called is worse than none: the
+        // form highlights nothing and the developer trusts the highlight.
+        JobErrors.ScheduledInThePast.FieldErrors!.Keys
+            .Should().BeSubsetOf([nameof(Job.ScheduledDate)]);
+        JobErrors.SignatureRequired.FieldErrors!.Keys
+            .Should().BeSubsetOf([nameof(Job.SignatureUrl)]);
+    }
+
+    [Fact]
+    public void A_state_refusal_names_no_field_because_no_field_is_wrong()
+    {
+        // BR-2 and BR-3 are about the job, not about the request. Naming a
+        // field would tell the user to change something that was fine.
+        JobErrors.Terminal.FieldErrors.Should().BeNull();
+        JobErrors.NotScheduled.FieldErrors.Should().BeNull();
+        JobErrors.NotFound.FieldErrors.Should().BeNull();
+    }
 }

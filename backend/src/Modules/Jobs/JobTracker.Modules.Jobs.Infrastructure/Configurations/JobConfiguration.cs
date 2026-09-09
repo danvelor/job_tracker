@@ -10,6 +10,15 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
     {
         builder.ToTable("jobs", table =>
         {
+            // Telling EF the truth about the table. It costs nothing today,
+            // because no column here is store-generated on update and EF
+            // therefore emits no RETURNING clause for the trigger to
+            // invalidate. The day updated_at is mapped as generated — the
+            // natural next step, so EF refreshes it after a save — EF would
+            // start using RETURNING and every update would throw a spurious
+            // concurrency exception. Declaring it now costs a line.
+            table.HasTrigger("tr_jobs_touch_updated_at");
+
             // BR-4 and BR-5 at the level of the data. The aggregate enforces
             // both, but a row written by anything other than the aggregate — a
             // migration, a psql session, a future service — must not be able to

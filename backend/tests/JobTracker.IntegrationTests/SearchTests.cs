@@ -306,4 +306,48 @@ public sealed class SearchTests(PostgresFixture postgres) : IntegrationTestBase(
         beforeSave.Should().Be(0);
         afterSave.Should().Be(1);
     }
+
+    [Fact]
+    public async Task A_photo_added_to_an_already_persisted_job_is_inserted_rather_than_updated()
+    {
+        // The gap that let a real bug through. Every earlier test completed a
+        // job before adding it, so the whole graph was Added and EF never had
+        // to decide. Completing a job that is already in the database is what
+        // the API actually does, and there EF emitted UPDATE for a row that
+        // did not exist yet.
+        var job = Job.Create(
+            "Ridge tile replacement", null,
+            Address.Create("12 Elm St", "Springfield", "IL", "62701", 39.78m, -89.65m).Value,
+            new DateOnly(2099, 5, 1), Assignee, Customer, Organization, Now).Value;
+        Context.Jobs.Add(job);
+        await Context.SaveChangesAsync();
+
+        job.Start(Now);
+        job.Complete(Now, "sig", [new NewJobPhoto("a.jpg", Now, "ridge")]);
+        await new UnitOfWork(Context).SaveChangesAsync();
+        Context.ChangeTracker.Clear();
+
+        var reloaded = await Repository().GetByIdAsync(job.Id);
+
+        reloaded!.Photos.Should().ContainSingle().Which.Caption.Should().Be("ridge");
+    }
+
+    [Fact]
+    public async Task Updating_a_persisted_job_through_SaveChanges_succeeds_despite_the_trigger()
+    {
+        // The other half of the same gap: no test drove a state transition
+        // through SaveChanges, only through raw SQL. That is the path every
+        // transition endpoint takes, and it was unexercised.
+        var job = Job.Create(
+            "Ridge tile replacement", null,
+            Address.Create("12 Elm St", "Springfield", "IL", "62701", 39.78m, -89.65m).Value,
+            new DateOnly(2099, 5, 1), Assignee, Customer, Organization, Now).Value;
+        Context.Jobs.Add(job);
+        await Context.SaveChangesAsync();
+
+        job.Start(Now.AddHours(1));
+        var save = async () => await new UnitOfWork(Context).SaveChangesAsync();
+
+        await save.Should().NotThrowAsync();
+    }
 }

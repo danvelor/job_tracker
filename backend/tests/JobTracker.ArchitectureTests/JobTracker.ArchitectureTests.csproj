@@ -22,6 +22,7 @@
          TenantRules is *about* the EF model, and the model only exists in
          Infrastructure. -->
     <ProjectReference Include="..\..\src\Modules\Jobs\JobTracker.Modules.Jobs.Infrastructure\JobTracker.Modules.Jobs.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Jobs\JobTracker.Modules.Jobs.Presentation\JobTracker.Modules.Jobs.Presentation.csproj" />
   </ItemGroup>
 
 

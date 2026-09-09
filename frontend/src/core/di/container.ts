@@ -1,4 +1,5 @@
 import type { JobsPort } from '@/core/application/ports/jobs.port';
+import { createHttpJobsAdapter } from '@/infrastructure/adapters/http-jobs.adapter';
 import { createInMemoryJobsAdapter } from '@/infrastructure/adapters/in-memory-jobs.adapter';
 
 export type Container = { readonly jobs: JobsPort };
@@ -23,14 +24,30 @@ declare global {
 }
 
 /**
- * The in-memory adapter is the only implementation for now, and D-01 makes it
- * the default in development and CI regardless — which is what lets the
- * end-to-end suite run with neither backend nor database. `HttpJobsAdapter`
- * arrives in plan 3, and selecting between them from configuration is the only
- * change this function needs then.
+ * The one place the application chooses an implementation.
+ *
+ * A configured API url means the real backend; no url means the in-memory
+ * adapter, which D-01 keeps as the default in development and CI — that is what
+ * lets the end-to-end suite run with neither backend nor database. The switch
+ * is a URL being present rather than a flag someone has to remember to set.
+ *
+ * The variable is read here rather than at module load, so a bundle built in CI
+ * does not carry CI's answer into the Compose stack.
  */
 function build(): Container {
-  return { jobs: createInMemoryJobsAdapter() };
+  const apiUrl = process.env.JOBTRACKER_API_URL;
+
+  return {
+    jobs:
+      apiUrl === undefined || apiUrl === ''
+        ? createInMemoryJobsAdapter()
+        : createHttpJobsAdapter({
+            baseUrl: apiUrl,
+            ...(process.env.JOBTRACKER_ORGANIZATION_ID === undefined
+              ? {}
+              : { organizationId: process.env.JOBTRACKER_ORGANIZATION_ID }),
+          }),
+  };
 }
 
 export function getContainer(): Container {

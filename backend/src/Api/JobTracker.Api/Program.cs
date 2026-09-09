@@ -1,0 +1,72 @@
+using System.Text;
+using JobTracker.Api;
+using JobTracker.Api.Authentication;
+using JobTracker.Common.Infrastructure;
+using JobTracker.Common.Presentation;
+using JobTracker.Modules.Jobs.Infrastructure;
+using JobTracker.Modules.Jobs.Presentation;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.IdentityModel.Tokens;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
+var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
+          ?? throw new InvalidOperationException("The Jwt configuration section is required.");
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options => options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwt.Issuer,
+        ValidAudience = jwt.Audience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key)),
+        // No clock skew. The default five minutes means an expired token keeps
+        // working for five more, which is five minutes of a revoked session.
+        ClockSkew = TimeSpan.Zero,
+    });
+
+// Every route requires an authenticated caller unless it opts out. The
+// framework default runs the other way, and one forgotten attribute is an open
+// route nobody notices until it is read.
+builder.Services.AddAuthorizationBuilder()
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
+builder.Services.AddSingleton<TokenIssuer>();
+
+builder.Services.AddJobsModule(
+    builder.Configuration.GetConnectionString("Database")
+    ?? throw new InvalidOperationException("ConnectionStrings:Database is required."));
+
+builder.Services.AddEndpoints(JobsPresentation.Assembly);
+builder.Services.AddOpenApi();
+builder.Services.AddProblemDetails();
+
+var app = builder.Build();
+
+app.UseExceptionHandler();
+app.UseAuthentication();
+app.UseAuthorization();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.MapDevToken();
+}
+
+app.MapEndpoints();
+
+app.Run();
+
+/// <summary>
+/// WebApplicationFactory needs a nameable type, and top-level statements do not
+/// produce a public one.
+/// </summary>
+public partial class Program;

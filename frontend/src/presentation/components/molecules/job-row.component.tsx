@@ -15,6 +15,12 @@ import { StatusBadge } from '../atoms/status-badge.component';
  * right for Scheduled by accident. getJobSummary lives on /jobs/[id] now,
  * where the timestamps are real.
  */
+/**
+ * An em dash rather than an empty cell: a blank reads as a rendering fault,
+ * and the accessible name would end in a bare comma.
+ */
+const scheduledDate = (job: VisibleJob): string => job.scheduledDate ?? '—';
+
 export function JobRow({
   job,
   onToggleSelect,
@@ -27,7 +33,7 @@ export function JobRow({
   return (
     <tr
       data-testid={`job-row-${job.id}`}
-      aria-label={`${job.title}, ${job.status}, ${job.scheduledDate}, ${job.assigneeName}`}
+      aria-label={`${job.title}, ${job.status}, ${scheduledDate(job)}, ${job.assigneeName}`}
       aria-busy={job.isPending}
       className={job.isPending ? 'opacity-60' : undefined}
     >
@@ -45,7 +51,7 @@ export function JobRow({
       <td className="px-3 py-2 text-sm text-slate-600">
         {job.address.street}, {job.address.city}
       </td>
-      <td className="px-3 py-2 text-sm">{job.scheduledDate}</td>
+      <td className="px-3 py-2 text-sm">{scheduledDate(job)}</td>
       <td className="px-3 py-2 text-sm">{job.assigneeName}</td>
       <td className="px-3 py-2">
         <StatusBadge testId={`job-row-${job.id}-status`} status={job.status} />
