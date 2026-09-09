@@ -1,4 +1,4 @@
-import { err, ok } from '@/core/domain/result.type';
+import { err, ok } from '@/core/domain/result';
 import type { CoreError, Result } from '@/core/domain/result.type';
 import type { JobDetail, JobSummary, Party } from '@/core/domain/job/job-summary.type';
 import type {

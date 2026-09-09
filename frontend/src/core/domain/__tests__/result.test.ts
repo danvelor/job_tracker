@@ -1,4 +1,4 @@
-import { err, isOk, ok } from '../result.type';
+import { err, isOk, ok } from '../result';
 import type { CoreError } from '../result.type';
 
 const failure: CoreError = {

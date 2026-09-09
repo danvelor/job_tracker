@@ -21,15 +21,11 @@ export type CoreError = {
 /**
  * Success or failure as a value. Expected failures are returned, never thrown;
  * exceptions are reserved for defects, exactly as on the backend.
+ *
+ * The constructors and the guard live in `result.ts`. A `*.type.ts` module
+ * carries no runtime code, which is what lets coverage exclude the suffix
+ * without excluding anything a test could exercise.
  */
 export type Result<T, E = CoreError> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly error: E };
-
-export const ok = <T>(value: T): Result<T, never> => ({ ok: true, value });
-
-export const err = <E>(error: E): Result<never, E> => ({ ok: false, error });
-
-export const isOk = <T, E>(
-  result: Result<T, E>,
-): result is { readonly ok: true; readonly value: T } => result.ok;

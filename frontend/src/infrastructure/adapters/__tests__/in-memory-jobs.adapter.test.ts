@@ -1,4 +1,4 @@
-import { isOk } from '@/core/domain/result.type';
+import { isOk } from '@/core/domain/result';
 import type { CoreError, Result } from '@/core/domain/result.type';
 import type { CreateJobInput } from '@/core/application/ports/jobs.port';
 import { createInMemoryJobsAdapter } from '../in-memory-jobs.adapter';
@@ -202,6 +202,18 @@ describe('InMemoryJobsAdapter', () => {
     const started = await adapter.start(id);
     expect(isOk(started)).toBe(false);
     if (!isOk(started)) expect(started.error.kind).toBe('conflict');
+  });
+
+  it('refuses to cancel a job that is already terminal (BR-2)', async () => {
+    const adapter = createInMemoryJobsAdapter();
+    const id = unwrap(await adapter.create(validInput));
+    await adapter.cancel(id, 'Weather');
+
+    // The other BR-2 case goes through start(); this one goes through
+    // cancel(), and each has its own terminal guard to exercise.
+    const again = await adapter.cancel(id, 'Changed our mind');
+    expect(isOk(again)).toBe(false);
+    if (!isOk(again)) expect(again.error.kind).toBe('conflict');
   });
 
   it('refuses a scheduled date in the past (BR-1)', async () => {
