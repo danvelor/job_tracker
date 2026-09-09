@@ -14,7 +14,7 @@ namespace JobTracker.IntegrationTests.Api;
 /// environment name — a factory that swapped the authentication handler for a
 /// permissive one would stop testing the thing most worth testing.
 /// </summary>
-public sealed class ApiFactory(string connectionString, string environment = "Development")
+public class ApiFactory(string connectionString, string environment = "Development")
     : WebApplicationFactory<Program>
 {
     public const string SigningKey = "integration-tests-signing-key-at-least-32-bytes-long";

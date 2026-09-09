@@ -57,6 +57,9 @@ builder.Services.AddBillingModule(
     builder.Configuration);
 
 builder.Services.AddSingleton<DatabaseMigrator>();
+builder.Services.Configure<RateLimitingOptions>(
+    builder.Configuration.GetSection(RateLimitingOptions.SectionName));
+builder.Services.AddTenantRateLimiting(builder.Configuration);
 
 builder.Services.AddEndpoints(JobsPresentation.Assembly);
 builder.Services.AddOpenApi();
@@ -67,6 +70,10 @@ var app = builder.Build();
 app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// After authentication, because the partition key is the org claim and a
+// limiter running before it would put every request in the anonymous bucket.
+app.UseRateLimiter();
 
 if (app.Environment.IsDevelopment())
 {
@@ -81,6 +88,10 @@ app.MapEndpoints();
 // container healthy.
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
     .AllowAnonymous()
+    // Compose polls this every few seconds. A limiter that counted those would
+    // eventually mark the container unhealthy under its own healthcheck — the
+    // system failing because it was watching itself.
+    .DisableRateLimiting()
     .WithTags("Diagnostics");
 
 // Before the first request is served, and only when configuration asks. A test
