@@ -1,51 +1,59 @@
+/**
+ * @jest-environment node
+ */
 import { getContainer, resetContainer } from '../container';
 
-describe('container', () => {
+describe('the container', () => {
+  const original = process.env.JOBTRACKER_API_URL;
+
   afterEach(() => {
+    if (original === undefined) {
+      delete process.env.JOBTRACKER_API_URL;
+    } else {
+      process.env.JOBTRACKER_API_URL = original;
+    }
     resetContainer();
   });
 
-  it('resolves an adapter that answers a search', async () => {
-    const container = getContainer();
-    const result = await container.jobs.search({ limit: 1 });
+  it('uses the in-memory adapter when no API url is configured', () => {
+    delete process.env.JOBTRACKER_API_URL;
+    resetContainer();
 
-    expect(result.ok).toBe(true);
+    // D-01 keeps in-memory the default in development and CI, which is what
+    // lets the end-to-end suite run with neither backend nor database. The
+    // switch is a URL being present, not a flag someone has to remember.
+    return expect(getContainer().jobs.search({ limit: 1 })).resolves.toMatchObject({ ok: true });
   });
 
-  it('returns the same instance on repeated calls', () => {
+  it('uses the HTTP adapter when an API url is configured', async () => {
+    // Pointed at a port nothing is listening on: an in-memory adapter would
+    // answer happily, and the HTTP one cannot reach anything. The failure is
+    // the evidence of which adapter was built.
+    process.env.JOBTRACKER_API_URL = 'http://127.0.0.1:1';
+    resetContainer();
+
+    const result = await getContainer().jobs.search({ limit: 1 });
+
+    expect(result.ok).toBe(false);
+  });
+
+  it('reads the API url on every build rather than once at import', async () => {
+    // Reading it at module load would bake the CI value into the bundle, and
+    // the Compose stack would silently keep serving the seeded array.
+    delete process.env.JOBTRACKER_API_URL;
+    resetContainer();
+    expect((await getContainer().jobs.search({ limit: 1 })).ok).toBe(true);
+
+    process.env.JOBTRACKER_API_URL = 'http://127.0.0.1:1';
+    resetContainer();
+    expect((await getContainer().jobs.search({ limit: 1 })).ok).toBe(false);
+  });
+
+  it('returns the same container across calls', () => {
+    resetContainer();
+
+    // The in-memory adapter holds state, so a container rebuilt per call would
+    // lose every job the moment a second entry point asked for one.
     expect(getContainer()).toBe(getContainer());
-  });
-
-  it('builds a fresh instance after a reset', () => {
-    const before = getContainer();
-    resetContainer();
-
-    expect(getContainer()).not.toBe(before);
-  });
-
-  it('does not carry writes across a reset', async () => {
-    const created = await getContainer().jobs.create({
-      title: 'Roof repair',
-      description: '',
-      address: {
-        street: '12 Elm St',
-        city: 'Springfield',
-        state: 'IL',
-        zipCode: '62701',
-        latitude: 39.78,
-        longitude: -89.65,
-      },
-      scheduledDate: '2099-03-14',
-      assigneeId: 'assignee-1',
-      customerId: 'customer-1',
-    });
-    expect(created.ok).toBe(true);
-
-    const afterCreate = await getContainer().jobs.search({ limit: 100 });
-    resetContainer();
-    const afterReset = await getContainer().jobs.search({ limit: 100 });
-
-    if (!afterCreate.ok || !afterReset.ok) throw new Error('expected both searches to succeed');
-    expect(afterReset.value.items.length).toBeLessThan(afterCreate.value.items.length);
   });
 });

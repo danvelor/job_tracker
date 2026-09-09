@@ -102,6 +102,7 @@ Projects are scaffolded incrementally; a command exists once its project does.
 # Backend
 dotnet build backend/JobTracker.sln
 dotnet test  backend/JobTracker.sln
+dotnet run --project backend/src/Api/JobTracker.Api   # needs PostgreSQL on 5432
 
 # Frontend
 npm --prefix frontend run lint
@@ -112,6 +113,13 @@ npm --prefix frontend run test:e2e     # Playwright, against the in-memory adapt
 # Full stack
 docker compose up --build              # postgres + mailhog + backend + frontend
 ```
+
+The frontend uses the in-memory adapter unless `JOBTRACKER_API_URL` is set; a
+url selects `HttpJobsAdapter` and the real backend (D-01). That is what lets the
+end-to-end suite run with neither backend nor database.
+
+.NET 9 is keg-only here, so every `dotnet` command needs
+`PATH="/opt/homebrew/opt/dotnet@9/bin:$PATH"`.
 
 `npm run typecheck` is not optional: `expect-type` assertions fail at compile
 time, so a broken type test leaves Jest green.

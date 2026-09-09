@@ -9,22 +9,36 @@ import { StatusBadge } from '@/presentation/components/atoms/status-badge.compon
  * list row, whose JobSummary carries no timestamps, no signature and no
  * photos — a row calling getJobSummary would have to fabricate all three.
  */
+/**
+ * A timestamp the status guarantees: the aggregate records startedAt when a job
+ * starts and completedAt when it completes. A missing one is a contradiction in
+ * the data rather than a case to render, and the epoch is a visibly wrong
+ * answer — better than substituting the scheduled date, which would look
+ * plausible and be read as fact.
+ */
+const stamped = (value: string | null): Date => new Date(value ?? 0);
+
 function toState(job: JobDetail): JobState {
   switch (job.status) {
     case 'Draft':
       return { status: 'Draft' };
 
     case 'Scheduled':
-      return {
-        status: 'Scheduled',
-        scheduledDate: new Date(job.scheduledDate),
-        assigneeId: job.assigneeId,
-      };
+      // A Scheduled job with no date is a contradiction the API cannot
+      // produce (D-14). Saying so is better than inventing a date: the
+      // summary then reads as what the row actually is.
+      return job.scheduledDate === null
+        ? { status: 'Draft', notes: 'no scheduled date recorded' }
+        : {
+            status: 'Scheduled',
+            scheduledDate: new Date(job.scheduledDate),
+            assigneeId: job.assigneeId,
+          };
 
     case 'InProgress':
       return {
         status: 'InProgress',
-        startedAt: new Date(job.startedAt ?? job.scheduledDate),
+        startedAt: stamped(job.startedAt),
         assigneeId: job.assigneeId,
         photos: job.photos.map((photo) => photo.url),
       };
@@ -32,8 +46,8 @@ function toState(job: JobDetail): JobState {
     case 'Completed':
       return {
         status: 'Completed',
-        startedAt: new Date(job.startedAt ?? job.scheduledDate),
-        completedAt: new Date(job.completedAt ?? job.scheduledDate),
+        startedAt: stamped(job.startedAt),
+        completedAt: stamped(job.completedAt),
         assigneeId: job.assigneeId,
         photos: job.photos.map((photo) => photo.url),
         signatureUrl: job.signatureUrl ?? '',
@@ -42,7 +56,7 @@ function toState(job: JobDetail): JobState {
     case 'Cancelled':
       return {
         status: 'Cancelled',
-        cancelledAt: new Date(job.cancelledAt ?? job.scheduledDate),
+        cancelledAt: stamped(job.cancelledAt),
         reason: job.cancellationReason ?? '',
       };
   }
