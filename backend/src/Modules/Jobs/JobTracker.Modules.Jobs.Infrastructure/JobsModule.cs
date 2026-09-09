@@ -3,6 +3,8 @@ using JobTracker.Common.Application;
 using JobTracker.Common.Application.Behaviors;
 using JobTracker.Modules.Jobs.Application.Jobs.CreateJob;
 using JobTracker.Modules.Jobs.Domain;
+using JobTracker.Modules.Jobs.Application.Abstractions;
+using JobTracker.Modules.Jobs.Infrastructure.Notifications;
 using JobTracker.Modules.Jobs.Infrastructure.Outbox;
 using JobTracker.Modules.Jobs.Infrastructure.Repositories;
 using Hangfire;
@@ -41,6 +43,10 @@ public static class JobsModule
         services.AddScoped<IJobRepository, JobRepository>();
         services.AddScoped<IPartyRepository, PartyRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<INotificationSender, LoggingNotificationSender>();
+        services.AddScoped<IBackgroundQueue, HangfireBackgroundQueue>();
+        services.AddScoped<MediatorJobRunner>();
 
         services.AddMediatR(configuration =>
         {

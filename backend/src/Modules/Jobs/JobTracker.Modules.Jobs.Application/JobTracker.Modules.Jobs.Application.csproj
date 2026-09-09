@@ -24,5 +24,6 @@
          an explicit grant rather than the handlers being widened to public for
          the convenience of the test project. -->
     <InternalsVisibleTo Include="JobTracker.Modules.Jobs.Application.UnitTests" />
+    <InternalsVisibleTo Include="JobTracker.IntegrationTests" />
   </ItemGroup>
 </Project>
