@@ -320,6 +320,57 @@ describe('HttpJobsAdapter', () => {
     expect(!result.ok && result.error.kind).toBe('failure');
   });
 
+  it('refreshes an expired token and retries the request once', async () => {
+    let issued = 0;
+    const server = await serving((request, response) => {
+      if (request.url === '/auth/dev-token') {
+        issued += 1;
+        json(response, 200, { token: `token-${issued}` });
+        return;
+      }
+
+      // The first token has expired. Anything minted after it is accepted,
+      // which is what the API does once the clock passes `exp`.
+      if (request.headers.authorization === 'Bearer token-1') {
+        problem(response, 401, 'auth.required');
+        return;
+      }
+
+      json(response, 200, { items: [A_JOB], nextCursor: null });
+    });
+
+    const adapter = createHttpJobsAdapter({ baseUrl: server.origin });
+    const result = await adapter.search({ limit: 10 });
+    await server.close();
+
+    // The token lives 60 minutes and the Next server outlives it. Caching it
+    // for the life of the process turns the whole page into an error boundary
+    // that no reload recovers from — only a restart.
+    expect(result.ok).toBe(true);
+    expect(server.seen.filter((request) => request.url === '/auth/dev-token')).toHaveLength(2);
+  });
+
+  it('retries a 401 once and then reports it rather than looping', async () => {
+    const server = await serving((request, response) => {
+      if (request.url === '/auth/dev-token') {
+        json(response, 200, { token: 'a-token' });
+        return;
+      }
+
+      problem(response, 401, 'auth.required');
+    });
+
+    const adapter = createHttpJobsAdapter({ baseUrl: server.origin });
+    const result = await adapter.search({ limit: 10 });
+    await server.close();
+
+    // A 401 that is not about expiry — a wrong key, a revoked principal —
+    // must not become an unbounded retry against the token endpoint.
+    expect(!result.ok && result.error.kind).toBe('unauthorized');
+    expect(server.seen.filter((request) => request.url === '/auth/dev-token')).toHaveLength(2);
+    expect(server.seen.filter((request) => request.url.startsWith('/api/jobs'))).toHaveLength(2);
+  });
+
   it('surfaces a 401 as unauthorized rather than as an empty list', async () => {
     const server = await serving(withToken((_, response) =>
       problem(response, 401, 'auth.required'),
