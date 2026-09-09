@@ -53,7 +53,7 @@ public sealed class ApiFactory(string connectionString, string environment = "De
         var context = scope.ServiceProvider.GetRequiredService<JobsDbContext>();
         await context.Database.MigrateAsync();
         await context.Database.ExecuteSqlRawAsync(
-            "truncate jobs.jobs, jobs.job_photos, jobs.outbox_messages cascade");
+            "truncate jobs.jobs, jobs.job_photos, jobs.outbox_messages, jobs.notifications cascade");
     }
 
     public async Task<HttpClient> AuthenticatedClientAsync(Guid organizationId)

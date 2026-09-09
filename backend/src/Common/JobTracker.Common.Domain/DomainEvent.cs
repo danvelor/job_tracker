@@ -21,4 +21,11 @@ public abstract record DomainEvent : IDomainEvent
     public Guid Id { get; init; } = Guid.NewGuid();
 
     public DateTimeOffset OccurredOn { get; init; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// Whose data this event is about. It travels because the outbox drain has
+    /// no request and therefore no claim behind it: without this, every
+    /// tenant-scoped query a handler makes would have nothing to filter by.
+    /// </summary>
+    public Guid OrganizationId { get; init; }
 }

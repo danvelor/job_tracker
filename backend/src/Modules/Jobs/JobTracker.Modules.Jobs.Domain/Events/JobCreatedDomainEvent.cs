@@ -7,5 +7,4 @@ namespace JobTracker.Modules.Jobs.Domain.Events;
 /// integration event, because notifying stays inside Jobs (D-22) — which is
 /// what makes it the counter-example architecture 4.1 needs.
 /// </summary>
-public sealed record JobCreatedDomainEvent(Guid JobId, Guid AssigneeId, Guid OrganizationId)
-    : DomainEvent;
+public sealed record JobCreatedDomainEvent(Guid JobId, Guid AssigneeId) : DomainEvent;

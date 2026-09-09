@@ -39,7 +39,11 @@ builder.Services.AddAuthorizationBuilder()
     .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
+// One scoped instance behind two interfaces: a request reads its claim, and
+// the outbox drain sets the tenant from the message it is processing.
+builder.Services.AddScoped<HttpTenantContext>();
+builder.Services.AddScoped<ITenantContext>(services => services.GetRequiredService<HttpTenantContext>());
+builder.Services.AddScoped<ITenantContextSetter>(services => services.GetRequiredService<HttpTenantContext>());
 builder.Services.AddSingleton<TokenIssuer>();
 
 builder.Services.AddJobsModule(

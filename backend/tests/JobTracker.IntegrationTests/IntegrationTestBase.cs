@@ -22,12 +22,18 @@ public abstract class IntegrationTestBase(PostgresFixture postgres) : IAsyncLife
     protected JobsDbContext Context { get; private set; } = null!;
 
     /// <summary>
+    /// The same object the context reads its tenant from, so a test can hand it
+    /// to the outbox processor exactly as the application does.
+    /// </summary>
+    protected MutableTenantContext Tenant { get; } = new(RosterSeed.DevelopmentOrganization);
+
+    /// <summary>
     /// Builds a context for another organization over the same data. Tenant
     /// isolation cannot be tested with one context: the filter has to be shown
     /// <em>not</em> returning rows a second tenant should never see.
     /// </summary>
     protected JobsDbContext ContextFor(Guid organizationId) =>
-        new(BuildOptions(), new FixedTenantContext(organizationId));
+        new(BuildOptions(), new MutableTenantContext(organizationId));
 
     private DbContextOptions<JobsDbContext> BuildOptions() =>
         new DbContextOptionsBuilder<JobsDbContext>()
@@ -44,7 +50,7 @@ public abstract class IntegrationTestBase(PostgresFixture postgres) : IAsyncLife
 
     public async Task InitializeAsync()
     {
-        Context = new JobsDbContext(BuildOptions(), new FixedTenantContext(Organization));
+        Context = new JobsDbContext(BuildOptions(), Tenant);
 
         // A clean schema per test rather than a clean container: the same
         // isolation for a hundredth of the cost. Dropping and re-migrating also

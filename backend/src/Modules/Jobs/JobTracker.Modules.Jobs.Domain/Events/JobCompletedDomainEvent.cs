@@ -13,6 +13,5 @@ namespace JobTracker.Modules.Jobs.Domain.Events;
 public sealed record JobCompletedDomainEvent(
     Guid JobId,
     Guid CustomerId,
-    Guid OrganizationId,
     DateTimeOffset StartedAt,
     DateTimeOffset CompletedAt) : DomainEvent;

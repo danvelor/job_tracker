@@ -1,3 +1,4 @@
+using JobTracker.Common.Infrastructure;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -17,6 +18,7 @@ namespace JobTracker.Modules.Jobs.Infrastructure.Outbox;
 public sealed class OutboxProcessor(
     JobsDbContext context,
     IPublisher publisher,
+    ITenantContextSetter tenant,
     TimeProvider time,
     IOptions<OutboxOptions> options)
 {
@@ -51,8 +53,16 @@ public sealed class OutboxProcessor(
         // notifying — this is the one place a broad catch is the right shape.
         try
         {
-            await publisher.Publish(
-                OutboxSerializer.Deserialize(message.Type, message.Content), cancellationToken);
+            var domainEvent = OutboxSerializer.Deserialize(message.Type, message.Content);
+
+            // A background job has no request and therefore no claim, so the
+            // tenant comes from the event. Without this every tenant-scoped
+            // query a handler makes has nothing to filter by — which is not a
+            // subtle failure, it is every handler throwing on its first read.
+            using (tenant.Use(domainEvent.OrganizationId))
+            {
+                await publisher.Publish(domainEvent, cancellationToken);
+            }
 
             message.MarkProcessed(time.GetUtcNow());
         }

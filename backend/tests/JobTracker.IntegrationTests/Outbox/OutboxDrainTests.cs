@@ -24,12 +24,12 @@ public sealed class OutboxDrainTests(PostgresFixture postgres) : IntegrationTest
     private readonly RecordingPublisher _publisher = new();
 
     private OutboxProcessor Processor(int batchSize = 20) =>
-        new(Context, _publisher, TimeProvider.System,
+        new(Context, _publisher, Tenant, TimeProvider.System,
             Options.Create(new OutboxOptions { BatchSize = batchSize }));
 
     /// <summary>A processor on its own context, so two can hold locks at once.</summary>
     private OutboxProcessor ConcurrentProcessor(RecordingPublisher publisher, int batchSize = 20) =>
-        new(ContextFor(Organization), publisher, TimeProvider.System,
+        new(ContextFor(Organization), publisher, Tenant, TimeProvider.System,
             Options.Create(new OutboxOptions { BatchSize = batchSize }));
 
     private async Task SeedJobs(int count)

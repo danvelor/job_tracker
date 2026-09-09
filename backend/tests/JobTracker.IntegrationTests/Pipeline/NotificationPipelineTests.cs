@@ -52,7 +52,7 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
             TimeProvider.System);
 
         var processor = new OutboxProcessor(
-            Context, new SingleHandlerPublisher(handler), TimeProvider.System,
+            Context, new SingleHandlerPublisher(handler), Tenant, TimeProvider.System,
             Options.Create(new OutboxOptions()));
 
         await processor.DrainAsync(default);
@@ -360,7 +360,7 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
         var publish = new PublishJobCompletedHandler(bus ?? new RecordingBus());
 
         var processor = new OutboxProcessor(
-            Context, new CompletionPublisher(customer, publish), TimeProvider.System,
+            Context, new CompletionPublisher(customer, publish), Tenant, TimeProvider.System,
             Options.Create(new OutboxOptions()));
 
         await processor.DrainAsync(default);

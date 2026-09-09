@@ -9,12 +9,33 @@ namespace JobTracker.Api;
 /// <c>org</c> claim and from nowhere else — no endpoint accepts one, because
 /// accepting one would invite forging it.
 /// </summary>
-internal sealed class HttpTenantContext(IHttpContextAccessor accessor) : ITenantContext
+internal sealed class HttpTenantContext(IHttpContextAccessor accessor)
+    : ITenantContext, ITenantContextSetter
 {
+    private Guid? _override;
+
+    /// <summary>
+    /// The outbox drain runs with no request behind it, so it declares the
+    /// organization from the message it is processing. The override wins while
+    /// it is in scope, and the claim is what every request uses.
+    /// </summary>
+    public IDisposable Use(Guid organizationId)
+    {
+        var previous = _override;
+        _override = organizationId;
+
+        return new Restore(() => _override = previous);
+    }
+
     public Guid OrganizationId
     {
         get
         {
+            if (_override is { } declared)
+            {
+                return declared;
+            }
+
             var claim = accessor.HttpContext?.User.FindFirstValue(TokenIssuer.OrganizationClaim);
 
             // Reaching a tenant-scoped query without a tenant is a defect in
@@ -27,5 +48,10 @@ internal sealed class HttpTenantContext(IHttpContextAccessor accessor) : ITenant
                 : throw new InvalidOperationException(
                     "No organization claim on a validated principal.");
         }
+    }
+
+    private sealed class Restore(Action undo) : IDisposable
+    {
+        public void Dispose() => undo();
     }
 }

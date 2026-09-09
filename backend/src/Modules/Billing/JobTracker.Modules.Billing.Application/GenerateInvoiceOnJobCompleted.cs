@@ -12,7 +12,7 @@ namespace JobTracker.Modules.Billing.Application;
 /// </summary>
 internal sealed class GenerateInvoiceOnJobCompletedHandler(
     IInvoiceRepository invoices,
-    IUnitOfWork unitOfWork,
+    IBillingUnitOfWork unitOfWork,
     IOptions<BillingOptions> options,
     TimeProvider time) : IIntegrationEventHandler<JobCompletedIntegrationEvent>
 {

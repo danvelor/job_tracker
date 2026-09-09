@@ -30,8 +30,10 @@ public static class BillingModule
 
         // Its own unit of work over its own context. Sharing Jobs' would make
         // one SaveChanges write both schemas, which is the coupling the
-        // boundary exists to prevent.
-        services.AddKeyedScoped<IUnitOfWork, BillingUnitOfWork>(nameof(BillingModule));
+        // boundary exists to prevent — and a keyed registration of the shared
+        // interface let the handler resolve Jobs' by asking for the unkeyed
+        // one, which compiled and wrote nothing.
+        services.AddScoped<IBillingUnitOfWork, BillingUnitOfWork>();
 
         services.AddScoped<
             IIntegrationEventHandler<JobCompletedIntegrationEvent>,
@@ -41,7 +43,7 @@ public static class BillingModule
     }
 }
 
-public sealed class BillingUnitOfWork(BillingDbContext context) : IUnitOfWork
+public sealed class BillingUnitOfWork(BillingDbContext context) : IBillingUnitOfWork
 {
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         context.SaveChangesAsync(cancellationToken);

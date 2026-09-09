@@ -18,5 +18,5 @@ internal sealed class JobsDbContextFactory : IDesignTimeDbContextFactory<JobsDbC
                 .UseNpgsql("Host=localhost;Database=design_time_only")
                 .UseSnakeCaseNamingConvention()
                 .Options,
-            new FixedTenantContext(Guid.Empty));
+            new MutableTenantContext(Guid.Empty));
 }

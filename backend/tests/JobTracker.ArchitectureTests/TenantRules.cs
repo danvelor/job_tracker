@@ -23,7 +23,7 @@ public sealed class TenantRules
                 .UseNpgsql("Host=model-only;Database=model-only")
                 .UseSnakeCaseNamingConvention()
                 .Options,
-            new FixedTenantContext(Guid.Empty));
+            new MutableTenantContext(Guid.Empty));
 
     [Fact]
     public void Every_tenant_scoped_entity_has_a_query_filter()
