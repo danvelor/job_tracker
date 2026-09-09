@@ -222,6 +222,56 @@ invoice has happened. An empty contract project would document an intention
 rather than a capability. The flow is one-way — Jobs publishes, Billing consumes
 — and the rule in 3.1 is already in place for the day that changes (D-24).
 
+### 3.6 Command and query separation
+
+The application layer of every module is split in two: commands that change
+state and queries that report it, each with its own handler, resolved by
+MediatR. Section 9.1 fixes the names and modifiers and NetArchTest enforces
+them.
+
+**What is separated is responsibility, not storage.** This is worth stating
+because CQRS is often read as "a write database and a read database", and that
+is a different thing. Here there is one PostgreSQL instance, one `DbContext` per
+module, one set of tables, and no event sourcing. Commands and queries meet the
+same rows; what differs is the model each uses to do it. The consequence is that
+this system is **strongly consistent**: a job written by a command is visible to
+the very next query, with no projection lag to reason about.
+
+A separate read store buys two things — read capacity scaled independently, and
+a shape the transactional schema cannot serve cheaply — and it charges eventual
+consistency between the two sides for them. Neither benefit applies to a job
+list served from an indexed table in the same database, so the price is not
+worth paying, and `NFR-5` is met by the keyset index rather than by a second
+copy of the data.
+
+**The asymmetry it does buy is real.** The two sides load different things
+because they need different things:
+
+| | Write side | Read side |
+|---|---|---|
+| Loads | The whole `Job` aggregate, tracked | A projection, `AsNoTracking` |
+| Why | An invariant cannot be checked on a partial object: `Complete` needs the status, the start time and the photo collection at once | Nobody needs an aggregate to paint a table row, and materialising one per row would pull photos and change-tracking state that the response discards |
+| Returns | `Result` or `Result<Guid>` — an outcome, not data | `Result<PagedList<JobResponse>>` — data, no side effect |
+| Example | `IJobRepository.GetByIdAsync` → `Job` | `IJobRepository.SearchAsync` → `JobSearchResult` (D-25) |
+
+That is why the same repository interface returns an aggregate from one method
+and a record from another. It looks inconsistent until the two methods are read
+as serving opposite sides.
+
+The practical payoff is that the two sides change for different reasons. Adding
+`BR-7` would touch the aggregate and no query. Adding a column to the job table
+would touch the projection and no invariant. A single model would have both
+edits landing in the same class, which is how a service class becomes a
+thousand lines.
+
+**Where the separation is not pushed further.** No command handler returns data
+beyond the identifier of what it created, and no query handler writes — a query
+that logged an audit row would be the usual way this erodes. There is no
+separate read model, no denormalised view table, and no second database, for the
+reason above. If the job list ever outgrew the index, the first step would be a
+materialised view refreshed from the outbox, and only the query handler would
+change — which is the property the separation exists to preserve.
+
 ---
 
 ## 4. Asynchronous pipeline
@@ -1024,7 +1074,7 @@ that has teeth.
 | **D-22** | Notifications are a record inside Jobs: `jobs.notifications`, `INotificationSender`, and an adapter that writes to the log | A third `Notifications` module with its own four layers | Notifying has no invariants and no lifecycle of its own, so the module would be anemic — and D-04 gave Billing a module precisely *because* `Invoice` has both. A separate module would also force `FR-8` across a boundary and into a `JobAssignedIntegrationEvent`: a public contract the domain does not ask for, created by the shape of the code rather than by the business | Notification is expressed in the language of Jobs. If it ever grows templates, channels or preferences, extracting it is a new module rather than a refactor |
 | **D-23** | One idempotency mechanism: every consumer earns it with a unique constraint on the data it writes. `outbox_message_consumers` is dropped | The generic consumer table — shared, per-module, or in a common schema | Line 246 names exactly one key, `JobId + CompletedAt`, and that is `uq_invoices_idempotency`. The generic table appears nowhere in the assessment, protects nothing the constraints do not, keys on a handler name that a rename invalidates, and forced Billing to write into the `jobs` schema against 6.1 | A future consumer with no natural business key would be unprotected. That day the table returns; today no such consumer exists |
 | **D-24** | Billing publishes no contract; there is no `Billing.IntegrationEvents` project | Keeping it with an `InvoiceRaisedIntegrationEvent` and no consumer; inventing a consumer in Jobs | Nothing needs to learn that an invoice was raised — `context/prd.md` section 9 excludes collection, tax and documents, and A5 step 6 says the interface does not claim it happened. The 3.2 diagram drew an arrow with no type behind it, and one false arrow costs the credibility of the three that are correct | The flow is one-way. Billing reads as a consumer, which is what it is |
-| **D-25** | `IJobRepository.SearchAsync` returns `IReadOnlyList<JobSearchResult>`, a projection declared in `Jobs.Domain`; the handler builds the `PagedList<JobResponse>` envelope | Returning `Job` aggregates; or letting the query handler reach the `DbContext` directly | Lines 220 and 208 contradict each other — one puts `SearchAsync` in the domain, the other demands projections without tracking. Aggregates fail 208; bypassing the repository lands on the rubric's *Insufficient* descriptor for Repository + UoW ("Direct DbContext usage in handlers", line 419) and leaves a dead method in the interface the assessment asked for | The domain declares a read model, which strict CQRS would place in the application layer. `JobSearchCriteria` is modelled as a Specification, where such a type does belong |
+| **D-25** | `IJobRepository.SearchAsync` returns `IReadOnlyList<JobSearchResult>`, a projection declared in `Jobs.Domain`; the handler builds the `PagedList<JobResponse>` envelope | Returning `Job` aggregates; or letting the query handler reach the `DbContext` directly | Lines 220 and 208 contradict each other — one puts `SearchAsync` in the domain, the other demands projections without tracking. Aggregates fail 208; bypassing the repository lands on the rubric's *Insufficient* descriptor for Repository + UoW ("Direct DbContext usage in handlers", line 419) and leaves a dead method in the interface the assessment asked for | The domain declares a read model, which strict CQRS would place in the application layer (3.6). `JobSearchCriteria` is modelled as a Specification, where such a type does belong |
 | **D-26** | `jobs.assignees` and `jobs.customers` are read-only rosters in the `jobs` schema, seeded by migration, with real foreign keys from `jobs.jobs` and two `GET` endpoints for the pickers | Keeping a hardcoded map in `Jobs.Application` mirrored in `InMemoryJobsAdapter`; denormalising the names onto `jobs.jobs` | Three controls in A8 need a roster, and under the definition of done in 8.1 the smoke run creates a job through the form against the real backend — two hardcoded maps can disagree and fail at step 2 rather than where the cause is. `context/prd.md` §9 excludes crew and customer *administration*, not their existence; these tables have no write path. `docs/normalization.md` calls a local replica the correct home for such a name, and `customer_name` still is not a column on `jobs.jobs` | Two tables and a seed the assessment never asked for, and D-21 reversed. In exchange, lines 261-262 are satisfied literally and the rubric's "correct FK relationships" stops being forfeited |
 
 ---
@@ -1038,6 +1088,7 @@ that has teeth.
 | `Job` aggregate, invariants, domain events | lines 169-175 | 3 — Aggregate design | 7 |
 | `Address` owned value object | lines 177-180 | 3 — Aggregate design, 4 — Schema design | 7 + 4 |
 | `JobPhoto` reachable only via the root | lines 182-185 | 3 — Aggregate design | 7 |
+| Command and query separation, and its limits (section 3.6) | lines 191-215 | 3 — CQRS and MediatR | 6 |
 | CQRS naming and modifiers (section 9.1) | lines 210-215 | 3 — CQRS and MediatR | 6 |
 | `Result` pattern, FluentValidation | lines 196-203 | 3 — CQRS and MediatR | 6 |
 | Repository interface plus implementation, partial split | lines 219-222 | 3 — Repository and UoW | 5 |
