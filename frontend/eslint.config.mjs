@@ -46,10 +46,16 @@ const eslintConfig = [
     },
   },
   {
-    // A slice's own files reach their own folders by relative path, which the
-    // pattern above would otherwise catch. The rule is about crossing INTO a
-    // slice from outside, not about a slice's internals.
-    files: ["src/presentation/views/*/features/*/**"],
+    // Two exemptions, for opposite reasons.
+    //
+    // A slice's own files reach their own folders by relative path: the rule
+    // is about crossing INTO a slice from outside, not about its internals.
+    //
+    // An App Router route is the composition root, and importing the view's
+    // barrel is precisely what a barrel is for. The barrel rule exists to stop
+    // a *slice* from importing upward and closing a loop; a route sits above
+    // the view and closes nothing.
+    files: ["src/presentation/views/*/features/*/**", "src/app/**"],
     rules: { "no-restricted-imports": "off" },
   },
   {
