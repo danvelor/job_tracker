@@ -47,5 +47,7 @@ Setup instructions are added as each part of the stack lands. See
 
 ## Status
 
-Work in progress. Repository initialized; implementation follows the plan in
-`docs/`.
+**Being rewritten.** This file is the initialisation stub: it names Vitest,
+which the frontend does not use, and it describes a repository that has since
+been built. Plan 5 replaces it wholesale rather than patching it, because a
+document that is wrong in several places is not improved by correcting one.
