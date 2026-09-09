@@ -243,7 +243,8 @@ identifiers carry the job identifier.
 | `filter-clear-button` | Clear |
 | `jobs-selection-summary` | Loaded and selected counts |
 | `jobs-table` | Table root |
-| `jobs-table-skeleton` | Suspense fallback |
+| `jobs-table-skeleton` | Suspense fallback, and only that |
+| `jobs-route-skeleton` | `loading.tsx`, the route transition. A separate id because it is a separate event: sharing one made both match a single locator during the streaming handoff |
 | `jobs-empty-no-jobs` | Empty, no filter |
 | `jobs-empty-no-matches` | Empty, filter active |
 | `jobs-error` | Error state root |

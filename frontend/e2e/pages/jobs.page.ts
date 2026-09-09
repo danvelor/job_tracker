@@ -23,8 +23,17 @@ export class JobsPage {
     return this.page.getByTestId('jobs-table-skeleton');
   }
 
+  /** The route transition's skeleton, a different event (design A8). */
+  get routeSkeleton(): Locator {
+    return this.page.getByTestId('jobs-route-skeleton');
+  }
+
   get emptyNoMatches(): Locator {
     return this.page.getByTestId('jobs-empty-no-matches');
+  }
+
+  get emptyNoJobs(): Locator {
+    return this.page.getByTestId('jobs-empty-no-jobs');
   }
 
   get selectionSummary(): Locator {
@@ -65,10 +74,23 @@ export class JobsPage {
     return this.page.locator('[data-testid^="job-row-"][data-testid$="-title"]');
   }
 
-  /** Waits on the skeleton leaving rather than on a fixed timeout (A8). */
+  /**
+   * Waits on the skeletons leaving rather than on a fixed timeout (A8). Both of
+   * them: the route transition's and the list's are different events, and
+   * against a real backend they are far enough apart to see.
+   */
   async waitForList(): Promise<void> {
+    await this.routeSkeleton.waitFor({ state: 'detached' });
     await this.skeleton.waitFor({ state: 'detached' });
-    await this.table.waitFor({ state: 'visible' });
+
+    // The table or the empty state: the page has settled either way. The
+    // in-memory adapter always has seeded rows, so waiting only for the table
+    // worked there and hung against a freshly migrated database — where an
+    // empty list is the correct first thing a reviewer sees.
+    await this.page
+      .locator('[data-testid="jobs-table"], [data-testid="jobs-empty-no-jobs"]')
+      .first()
+      .waitFor({ state: 'visible' });
   }
 
   get newJobButton(): Locator {
@@ -123,8 +145,12 @@ export class JobsPage {
     await this.createField('latitude').fill('39.78');
     await this.createField('longitude').fill('-89.65');
     await this.createField('scheduled-date').fill('2099-06-01');
-    await this.createField('assignee').selectOption('assignee-1');
-    await this.createField('customer').selectOption('customer-1');
+    // By label, not by value. The in-memory adapter's identifiers are
+    // 'assignee-1'; the real backend's are GUIDs from the seed migration. The
+    // names are the same on both sides, which is what lets one page object
+    // drive both suites.
+    await this.createField('assignee').selectOption({ label: 'J. Ortiz' });
+    await this.createField('customer').selectOption({ label: 'Acme Holdings' });
     await this.createSubmit.click();
     await this.createModal.waitFor({ state: 'detached' });
   }
