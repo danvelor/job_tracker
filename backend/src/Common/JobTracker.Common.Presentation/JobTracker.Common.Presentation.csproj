@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <!-- A class library reaches ASP.NET Core through a framework reference
+         rather than a package; the packages exist only for the host. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\JobTracker.Common.Domain\JobTracker.Common.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

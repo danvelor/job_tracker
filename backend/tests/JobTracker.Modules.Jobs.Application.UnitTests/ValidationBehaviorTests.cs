@@ -102,4 +102,42 @@ public sealed class ValidationBehaviorTests
         public SecondRule() =>
             RuleFor(probe => probe.Name).MinimumLength(3).WithMessage("too short");
     }
+
+    [Fact]
+    public async Task A_failure_names_the_fields_that_failed()
+    {
+        var behavior = new ValidationBehavior<Probe, Result>([new ProbeValidator()]);
+
+        var result = await behavior.Handle(
+            new Probe(""), () => Task.FromResult(Result.Success()), CancellationToken.None);
+
+        // Without the map a form can only show one banner. With it, the field
+        // that failed is the field that lights up — and Presentation lifts it
+        // straight into the `errors` member of a ProblemDetails.
+        result.Error.FieldErrors.Should().ContainKey(nameof(Probe.Name));
+        result.Error.FieldErrors![nameof(Probe.Name)].Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_field_broken_twice_carries_both_messages()
+    {
+        var behavior = new ValidationBehavior<Probe, Result>([new TwoRuleValidator()]);
+
+        var result = await behavior.Handle(
+            new Probe(""), () => Task.FromResult(Result.Success()), CancellationToken.None);
+
+        // Grouping by field rather than keeping the last message: telling
+        // someone one problem at a time hides the way forward, and that
+        // applies within a field as much as across them.
+        result.Error.FieldErrors![nameof(Probe.Name)].Should().HaveCount(2);
+    }
+
+    private sealed class TwoRuleValidator : AbstractValidator<Probe>
+    {
+        public TwoRuleValidator()
+        {
+            RuleFor(probe => probe.Name).NotEmpty();
+            RuleFor(probe => probe.Name).MinimumLength(3);
+        }
+    }
 }
