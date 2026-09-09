@@ -1,0 +1,11 @@
+# Build output. Copying it in would ship a developer's Debug binaries into a
+# Release image, and the layer would be invalidated by every local build.
+**/bin/
+**/obj/
+
+# The API is what gets published; the test projects are not in its graph.
+tests/
+
+**/.vs/
+**/.idea/
+**/*.user

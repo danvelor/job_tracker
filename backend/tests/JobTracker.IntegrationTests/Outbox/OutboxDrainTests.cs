@@ -1,4 +1,5 @@
 using FluentAssertions;
+using JobTracker.Modules.Jobs.Application.Abstractions;
 using JobTracker.Modules.Jobs.Domain;
 using JobTracker.Modules.Jobs.Domain.Events;
 using JobTracker.Modules.Jobs.Infrastructure.Outbox;
@@ -23,13 +24,16 @@ public sealed class OutboxDrainTests(PostgresFixture postgres) : IntegrationTest
 
     private readonly RecordingPublisher _publisher = new();
 
+    /// <summary>These tests are about the drain, not about what it queues.</summary>
+    private static IBackgroundQueue NoQueue => new NullQueue();
+
     private OutboxProcessor Processor(int batchSize = 20) =>
-        new(Context, _publisher, Tenant, TimeProvider.System,
+        new(Context, _publisher, Tenant, NoQueue, TimeProvider.System,
             Options.Create(new OutboxOptions { BatchSize = batchSize }));
 
     /// <summary>A processor on its own context, so two can hold locks at once.</summary>
     private OutboxProcessor ConcurrentProcessor(RecordingPublisher publisher, int batchSize = 20) =>
-        new(ContextFor(Organization), publisher, Tenant, TimeProvider.System,
+        new(ContextFor(Organization), publisher, Tenant, NoQueue, TimeProvider.System,
             Options.Create(new OutboxOptions { BatchSize = batchSize }));
 
     private async Task SeedJobs(int count)
@@ -204,6 +208,14 @@ public sealed class OutboxDrainTests(PostgresFixture postgres) : IntegrationTest
         second.Published.Should().BeEmpty();
         blocking.Published.Should().HaveCount(5);
         (await Unprocessed()).Should().Be(0);
+    }
+
+    private sealed class NullQueue : IBackgroundQueue
+    {
+        public void Enqueue<TRequest>(TRequest request, Guid organizationId)
+            where TRequest : notnull { }
+
+        public void Flush() { }
     }
 
     private sealed class RecordingPublisher : IPublisher

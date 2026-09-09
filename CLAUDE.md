@@ -111,7 +111,7 @@ npm --prefix frontend test             # Jest
 npm --prefix frontend run test:e2e     # Playwright, against the in-memory adapter
 
 # Full stack
-docker compose up --build              # postgres + mailhog + backend + frontend
+docker compose up --build              # postgres + backend + frontend
 ```
 
 The frontend uses the in-memory adapter unless `JOBTRACKER_API_URL` is set; a

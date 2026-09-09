@@ -7,6 +7,7 @@ using JobTracker.Modules.Billing.Infrastructure;
 using JobTracker.Modules.Jobs.Infrastructure;
 using JobTracker.Modules.Jobs.Presentation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Hangfire;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 
@@ -56,6 +57,11 @@ builder.Services.AddBillingModule(
     ?? throw new InvalidOperationException("ConnectionStrings:Database is required."),
     builder.Configuration);
 
+builder.Services.AddSingleton<DatabaseMigrator>();
+builder.Services.Configure<RateLimitingOptions>(
+    builder.Configuration.GetSection(RateLimitingOptions.SectionName));
+builder.Services.AddTenantRateLimiting(builder.Configuration);
+
 builder.Services.AddEndpoints(JobsPresentation.Assembly);
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
@@ -66,13 +72,57 @@ app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// After authentication, because the partition key is the org claim and a
+// limiter running before it would put every request in the anonymous bucket.
+app.UseRateLimiter();
+
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    // AllowAnonymous on both. The fallback policy applies to a request that
+    // selects no endpoint, so without it the pipeline refuses these before
+    // their own middleware sees them — which is what happened, and what a
+    // README promising the URLs is what caught.
+    app.MapOpenApi().AllowAnonymous();
     app.MapDevToken();
+
+    // Architecture 7.5. Two conditions, not one: registered only here, and
+    // reachable only from loopback. ASPNETCORE_ENVIRONMENT is a string in a
+    // Compose file and its failure mode is silent, so the filter is the
+    // condition that does not depend on somebody getting that right.
+    app.MapHangfireDashboard("/hangfire", new DashboardOptions
+    {
+        Authorization = [new LocalOnlyDashboardFilter()],
+        // The dashboard is for reading. A reviewer who can requeue a job from
+        // it can also produce a duplicate invoice by hand, which would be a
+        // confusing thing to discover in the data.
+        IsReadOnlyFunc = _ => true,
+    })
+        // Mapped as an endpoint and marked anonymous, rather than middleware
+        // ahead of the pipeline. The dashboard cannot use bearer auth — a
+        // browser sends no Authorization header — so its guards are the two
+        // above: Development only, and loopback only.
+        .AllowAnonymous();
 }
 
 app.MapEndpoints();
+
+// Anonymous and unmetered: Compose polls it before the container has any
+// credentials, and a healthcheck that needed a token would never turn the
+// container healthy.
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
+    .AllowAnonymous()
+    // Compose polls this every few seconds. A limiter that counted those would
+    // eventually mark the container unhealthy under its own healthcheck — the
+    // system failing because it was watching itself.
+    .DisableRateLimiting()
+    .WithTags("Diagnostics");
+
+// Before the first request is served, and only when configuration asks. A test
+// host that migrated on every start would fight its own fixture.
+if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
+    await app.Services.GetRequiredService<DatabaseMigrator>().MigrateAsync(default);
+}
 
 app.Services.UseJobsModule();
 
