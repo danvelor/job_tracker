@@ -7,6 +7,7 @@ using JobTracker.Modules.Billing.Infrastructure;
 using JobTracker.Modules.Jobs.Infrastructure;
 using JobTracker.Modules.Jobs.Presentation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Hangfire;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 
@@ -79,6 +80,19 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.MapDevToken();
+
+    // Architecture 7.5. Two conditions, not one: registered only here, and
+    // reachable only from loopback. ASPNETCORE_ENVIRONMENT is a string in a
+    // Compose file and its failure mode is silent, so the filter is the
+    // condition that does not depend on somebody getting that right.
+    app.UseHangfireDashboard("/hangfire", new DashboardOptions
+    {
+        Authorization = [new LocalOnlyDashboardFilter()],
+        // The dashboard is for reading. A reviewer who can requeue a job from
+        // it can also produce a duplicate invoice by hand, which would be a
+        // confusing thing to discover in the data.
+        IsReadOnlyFunc = _ => true,
+    });
 }
 
 app.MapEndpoints();
