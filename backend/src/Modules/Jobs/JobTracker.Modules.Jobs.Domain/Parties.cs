@@ -8,7 +8,7 @@ namespace JobTracker.Modules.Jobs.Domain;
 /// controls in the interface need something to offer, and a row showing a UUID
 /// is useless.
 /// </summary>
-public sealed class Assignee : Entity
+public sealed class Assignee : Entity, ITenantScoped
 {
     private Assignee() { }
 
@@ -16,7 +16,7 @@ public sealed class Assignee : Entity
     public string Name { get; private init; } = string.Empty;
 }
 
-public sealed class Customer : Entity
+public sealed class Customer : Entity, ITenantScoped
 {
     private Customer() { }
 

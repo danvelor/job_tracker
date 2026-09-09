@@ -9,7 +9,7 @@ namespace JobTracker.Modules.Jobs.Domain;
 /// <see cref="Result"/> rather than throwing: the model is not anemic because
 /// the rules live with the data they constrain.
 /// </summary>
-public sealed class Job : AggregateRoot
+public sealed class Job : AggregateRoot, ITenantScoped
 {
     private readonly List<JobPhoto> _photos = [];
 
