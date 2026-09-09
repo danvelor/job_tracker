@@ -40,9 +40,18 @@ export function useFilterJobs() {
   );
 
   const setDateRange = useCallback(
-    (from: string | null, to: string | null) =>
-      setFilter({ scheduledFrom: from, scheduledTo: to }),
-    [setFilter],
+    (from: string | null, to: string | null) => {
+      // Design A3 specifies a from <= to guard. An inverted range matches
+      // nothing, which reads as a bug rather than as a filter, so whichever
+      // bound the user just moved drags the other with it.
+      if (from !== null && to !== null && from > to) {
+        const moved = from !== filters.scheduledFrom ? from : to;
+        setFilter({ scheduledFrom: moved, scheduledTo: moved });
+        return;
+      }
+      setFilter({ scheduledFrom: from, scheduledTo: to });
+    },
+    [filters.scheduledFrom, setFilter],
   );
 
   const setAssignee = useCallback(

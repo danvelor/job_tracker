@@ -8,7 +8,11 @@ import type { Party } from '@/core/domain/job/job-summary.type';
 import { makeVisibleJobsSelector, useJobsUiStore } from '@/presentation/stores/jobs-ui.store';
 import type { VisibleJob } from '@/presentation/stores/jobs-ui.store';
 import { jobsEventBus } from '@/shared/events/jobs-event-bus';
+import { useCancelJob } from '../features/cancel-job';
+import { useCompleteJob } from '../features/complete-job';
+import { useCreateJob } from '../features/create-job';
 import { useFilterJobs } from '../features/filter-jobs';
+import { useStartJob } from '../features/start-job';
 
 const fetchPage = async (key: string): Promise<PagedJobs> => {
   const response = await fetch(key);
@@ -31,8 +35,19 @@ const fetchPage = async (key: string): Promise<PagedJobs> => {
  * and never resumes in jsdom, so a hook that called it could only ever be
  * exercised through Playwright.
  */
-export function useJobsPage(initial: PagedJobs, assignees: readonly Party[]) {
+export function useJobsPage(
+  initial: PagedJobs,
+  assignees: readonly Party[],
+  customers: readonly Party[],
+) {
   const filter = useFilterJobs();
+
+  // The orchestrator composes the slices; none of them knows the others
+  // exist. This is the only place they meet.
+  const create = useCreateJob();
+  const start = useStartJob();
+  const cancel = useCancelJob();
+  const complete = useCompleteJob();
   const { sortConfig, cursor, selectedJobIds, toggleSelection } = useJobsUiStore(
     useShallow((state) => ({
       sortConfig: state.sortConfig,
@@ -89,6 +104,11 @@ export function useJobsPage(initial: PagedJobs, assignees: readonly Party[]) {
   return {
     jobs,
     assignees,
+    customers,
+    create,
+    start,
+    cancel,
+    complete,
     selectedCount: selectedJobIds.length,
     hasActiveFilter: filter.hasActiveFilter,
     isLoading,

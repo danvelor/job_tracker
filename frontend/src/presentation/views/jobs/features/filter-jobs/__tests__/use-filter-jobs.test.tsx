@@ -61,6 +61,28 @@ describe('useFilterJobs', () => {
     expect(result.current.filters.scheduledTo).toBe('2099-03-31');
   });
 
+  it('clamps a from date later than the to date (design A3)', () => {
+    const { result } = renderHook(() => useFilterJobs());
+
+    act(() => result.current.setDateRange('2099-03-01', '2099-03-31'));
+    act(() => result.current.setDateRange('2099-04-15', '2099-03-31'));
+
+    // An inverted range matches nothing, which reads as a bug rather than as
+    // a filter, so whichever bound moved drags the other with it.
+    expect(result.current.filters.scheduledFrom).toBe('2099-04-15');
+    expect(result.current.filters.scheduledTo).toBe('2099-04-15');
+  });
+
+  it('clamps a to date earlier than the from date', () => {
+    const { result } = renderHook(() => useFilterJobs());
+
+    act(() => result.current.setDateRange('2099-03-10', '2099-03-31'));
+    act(() => result.current.setDateRange('2099-03-10', '2099-03-01'));
+
+    expect(result.current.filters.scheduledFrom).toBe('2099-03-01');
+    expect(result.current.filters.scheduledTo).toBe('2099-03-01');
+  });
+
   it('reports whether any filter is active', () => {
     const { result } = renderHook(() => useFilterJobs());
     expect(result.current.hasActiveFilter).toBe(false);

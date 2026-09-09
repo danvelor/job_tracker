@@ -39,14 +39,14 @@ beforeEach(() => {
  */
 describe('useJobsPage', () => {
   it('renders the rows the server component resolved', async () => {
-    const { result } = renderHook(() => useJobsPage(page, []));
+    const { result } = renderHook(() => useJobsPage(page, [], []));
 
     await waitFor(() => expect(result.current.jobs).toHaveLength(1));
     expect(result.current.jobs[0].title).toBe('Ridge tile replacement');
   });
 
   it('overlays the optimistic status onto the rows', async () => {
-    const { result } = renderHook(() => useJobsPage(page, []));
+    const { result } = renderHook(() => useJobsPage(page, [], []));
     await waitFor(() => expect(result.current.jobs).toHaveLength(1));
 
     act(() => useJobsUiStore.getState().beginOptimistic('job-1', 'InProgress', 'Scheduled'));
@@ -56,7 +56,7 @@ describe('useJobsPage', () => {
   });
 
   it('keeps the visible rows referentially stable across unrelated changes', async () => {
-    const { result } = renderHook(() => useJobsPage(page, []));
+    const { result } = renderHook(() => useJobsPage(page, [], []));
     await waitFor(() => expect(result.current.jobs).toHaveLength(1));
 
     const before = result.current.jobs;
@@ -66,7 +66,7 @@ describe('useJobsPage', () => {
   });
 
   it('refetches when a slice emits jobs:invalidate', async () => {
-    const { result } = renderHook(() => useJobsPage(page, []));
+    const { result } = renderHook(() => useJobsPage(page, [], []));
     await waitFor(() => expect(result.current.jobs).toHaveLength(1));
     const before = fetchMock.mock.calls.length;
 
@@ -76,7 +76,7 @@ describe('useJobsPage', () => {
   });
 
   it('unsubscribes from the bus when it unmounts', async () => {
-    const { result, unmount } = renderHook(() => useJobsPage(page, []));
+    const { result, unmount } = renderHook(() => useJobsPage(page, [], []));
     await waitFor(() => expect(result.current.jobs).toHaveLength(1));
 
     unmount();

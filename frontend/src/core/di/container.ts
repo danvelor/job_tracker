@@ -3,7 +3,24 @@ import { createInMemoryJobsAdapter } from '@/infrastructure/adapters/in-memory-j
 
 export type Container = { readonly jobs: JobsPort };
 
-let instance: Container | null = null;
+declare global {
+  /**
+   * The container lives on globalThis, not in a module-level binding.
+   *
+   * Next bundles page code, Route Handlers and Server Actions into separate
+   * server chunks, and a module-level `let` is per-chunk rather than
+   * per-process. A job created by the create-job Server Action was invisible
+   * to both `GET /api/jobs` and the page: three entry points, three
+   * containers, three copies of the seeded array. globalThis is the one scope
+   * they share.
+   *
+   * This only matters because the in-memory adapter holds state. Once
+   * HttpJobsAdapter arrives in plan 3 the state lives in PostgreSQL and the
+   * container becomes stateless — but the seam would still be here, so the
+   * pattern stays.
+   */
+  var __jobTrackerContainer: Container | undefined;
+}
 
 /**
  * The in-memory adapter is the only implementation for now, and D-01 makes it
@@ -17,8 +34,8 @@ function build(): Container {
 }
 
 export function getContainer(): Container {
-  instance ??= build();
-  return instance;
+  globalThis.__jobTrackerContainer ??= build();
+  return globalThis.__jobTrackerContainer;
 }
 
 /**
@@ -27,5 +44,5 @@ export function getContainer(): Container {
  * next and the suite passes or fails on execution order.
  */
 export function resetContainer(): void {
-  instance = null;
+  globalThis.__jobTrackerContainer = undefined;
 }
