@@ -29,7 +29,7 @@ rosters before it starts serving, so the interface works on the first click.
 | Interface | <http://localhost:3000/jobs> |
 | API | <http://localhost:8080> |
 | OpenAPI | <http://localhost:8080/openapi/v1.json> |
-| Background jobs | <http://localhost:8080/hangfire> — the outbox drain and every send |
+| Background jobs | <http://localhost:8080/hangfire> — the outbox drain and every send. Development only, and refused from a public address |
 | Database | `localhost:5432`, `jobtracker` / `jobtracker` |
 
 Watch the asynchronous half work: create a job, complete it, and within a few

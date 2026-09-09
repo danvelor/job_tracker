@@ -67,23 +67,91 @@ public sealed class DashboardTests(PostgresFixture postgres) : IAsyncLifetime
         // The reviewer's case: a published port from the host, or
         // `docker compose exec`. It has to actually work, or the second
         // condition would be indistinguishable from having removed it.
+        //
+        // Asserting success rather than "not 404 and not Forbidden", which is
+        // what this said first and which a 401 satisfies. It was a 401 — the
+        // fallback authorization policy applies to a request that selects no
+        // endpoint, so it refused the dashboard before Hangfire's middleware
+        // ever saw it. The weaker assertion let a dead feature pass, and the
+        // README is what caught it by promising a URL that did not work.
         var response = await _api.CreateClient().GetAsync("/hangfire");
 
-        response.StatusCode.Should().NotBe(HttpStatusCode.NotFound);
-        response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
+        response.IsSuccessStatusCode.Should().BeTrue(
+            "the dashboard has to be reachable, or its two guards guard nothing — got {0}",
+            response.StatusCode);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("Hangfire");
     }
 
     [Fact]
-    public void The_filter_refuses_an_address_that_is_not_loopback()
+    public async Task The_OpenAPI_document_is_reachable_in_development()
     {
-        // ASPNETCORE_ENVIRONMENT is a string in a Compose file and its failure
-        // mode is silent, so Development-only is not enough on its own. This is
-        // the condition that does not depend on somebody getting that right.
+        // The README points a reviewer at it. Same failure as the dashboard,
+        // same cause, and it would have shipped as a broken link.
+        var response = await _api.CreateClient().GetAsync("/openapi/v1.json");
+
+        response.IsSuccessStatusCode.Should().BeTrue();
+    }
+
+    [Fact]
+    public void The_filter_refuses_a_public_address()
+    {
+        // The second condition. It is the weaker one — see the class comment —
+        // and it is here because ASPNETCORE_ENVIRONMENT is a string in a
+        // Compose file whose failure mode is silent.
         var filter = new LocalOnlyDashboardFilter();
 
-        filter.ShouldAllow(System.Net.IPAddress.Parse("203.0.113.9")).Should().BeFalse();
-        filter.ShouldAllow(System.Net.IPAddress.Loopback).Should().BeTrue();
-        filter.ShouldAllow(System.Net.IPAddress.IPv6Loopback).Should().BeTrue();
+        filter.ShouldAllow(IPAddress.Parse("203.0.113.9")).Should().BeFalse();
+        filter.ShouldAllow(IPAddress.Parse("8.8.8.8")).Should().BeFalse();
+        filter.ShouldAllow(IPAddress.Parse("2001:db8::1")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void The_filter_allows_loopback_and_the_private_network_the_stack_runs_on()
+    {
+        var filter = new LocalOnlyDashboardFilter();
+
+        filter.ShouldAllow(IPAddress.Loopback).Should().BeTrue();
+        filter.ShouldAllow(IPAddress.IPv6Loopback).Should().BeTrue();
+
+        // 172.18.0.1 is not a detail invented for this test. It is the Docker
+        // bridge gateway, and it is the address the container actually sees
+        // when a reviewer opens a published port from the host — which
+        // loopback-only refused, leaving the dashboard dead in the one
+        // environment it exists for.
+        filter.ShouldAllow(IPAddress.Parse("172.18.0.1")).Should().BeTrue();
+        filter.ShouldAllow(IPAddress.Parse("10.1.2.3")).Should().BeTrue();
+        filter.ShouldAllow(IPAddress.Parse("192.168.1.5")).Should().BeTrue();
+    }
+
+    [Fact]
+    public void The_filter_unmaps_an_IPv4_address_that_arrived_over_a_dual_stack_socket()
+    {
+        // Kestrel binds dual-stack, so an IPv4 client arrives as
+        // ::ffff:192.168.65.1 rather than as 192.168.65.1. IPAddress.IsLoopback
+        // unmaps internally, which is why the dashboard worked from inside the
+        // container and answered 401 from the host — the range check saw an
+        // IPv6 address in no private v6 range and refused it.
+        var filter = new LocalOnlyDashboardFilter();
+
+        filter.ShouldAllow(IPAddress.Parse("192.168.65.1").MapToIPv6()).Should().BeTrue();
+        filter.ShouldAllow(IPAddress.Parse("172.18.0.1").MapToIPv6()).Should().BeTrue();
+
+        // And it must not become a way in: a mapped public address is still a
+        // public address.
+        filter.ShouldAllow(IPAddress.Parse("203.0.113.9").MapToIPv6()).Should().BeFalse();
+    }
+
+    [Fact]
+    public void The_filter_refuses_an_address_just_outside_the_private_ranges()
+    {
+        // 172.16/12 ends at 172.31.255.255, and a range check written by eye
+        // usually gets that boundary wrong in one direction or the other.
+        var filter = new LocalOnlyDashboardFilter();
+
+        filter.ShouldAllow(IPAddress.Parse("172.31.255.255")).Should().BeTrue();
+        filter.ShouldAllow(IPAddress.Parse("172.32.0.1")).Should().BeFalse();
+        filter.ShouldAllow(IPAddress.Parse("172.15.0.1")).Should().BeFalse();
+        filter.ShouldAllow(IPAddress.Parse("11.0.0.1")).Should().BeFalse();
     }
 
     [Fact]

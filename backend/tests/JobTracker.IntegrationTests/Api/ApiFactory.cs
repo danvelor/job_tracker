@@ -1,6 +1,8 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using JobTracker.Modules.Jobs.Infrastructure;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +37,14 @@ public class ApiFactory(string connectionString, string environment = "Developme
         // mid-test: a drain running under a test would make every assertion
         // about outbox rows a race. Tests that want a drain call the processor.
         builder.UseSetting("Outbox:PollSeconds", "59");
+
+        // TestServer has no socket, so Connection.RemoteIpAddress is null,
+        // where real Kestrel always sets one. Supplying loopback restores what
+        // the test host omits rather than relaxing anything: the dashboard
+        // filter refuses null on purpose, and its unit tests cover a genuinely
+        // remote address directly.
+        builder.ConfigureServices(services =>
+            services.AddSingleton<IStartupFilter, LoopbackConnectionFilter>());
     }
 
     /// <summary>
@@ -67,4 +77,19 @@ public class ApiFactory(string connectionString, string environment = "Developme
     }
 
     private sealed record DevToken(string Token);
+
+    private sealed class LoopbackConnectionFilter : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) =>
+            app =>
+            {
+                app.Use(async (context, following) =>
+                {
+                    context.Connection.RemoteIpAddress ??= IPAddress.Loopback;
+                    await following();
+                });
+
+                next(app);
+            };
+    }
 }

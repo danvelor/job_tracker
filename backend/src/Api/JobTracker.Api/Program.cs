@@ -78,21 +78,30 @@ app.UseRateLimiter();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    // AllowAnonymous on both. The fallback policy applies to a request that
+    // selects no endpoint, so without it the pipeline refuses these before
+    // their own middleware sees them — which is what happened, and what a
+    // README promising the URLs is what caught.
+    app.MapOpenApi().AllowAnonymous();
     app.MapDevToken();
 
     // Architecture 7.5. Two conditions, not one: registered only here, and
     // reachable only from loopback. ASPNETCORE_ENVIRONMENT is a string in a
     // Compose file and its failure mode is silent, so the filter is the
     // condition that does not depend on somebody getting that right.
-    app.UseHangfireDashboard("/hangfire", new DashboardOptions
+    app.MapHangfireDashboard("/hangfire", new DashboardOptions
     {
         Authorization = [new LocalOnlyDashboardFilter()],
         // The dashboard is for reading. A reviewer who can requeue a job from
         // it can also produce a duplicate invoice by hand, which would be a
         // confusing thing to discover in the data.
         IsReadOnlyFunc = _ => true,
-    });
+    })
+        // Mapped as an endpoint and marked anonymous, rather than middleware
+        // ahead of the pipeline. The dashboard cannot use bearer auth — a
+        // browser sends no Authorization header — so its guards are the two
+        // above: Development only, and loopback only.
+        .AllowAnonymous();
 }
 
 app.MapEndpoints();
