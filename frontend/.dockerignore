@@ -1,0 +1,14 @@
+# Reinstalled from the lockfile inside the image. Copying it in would carry a
+# developer's platform-specific binaries into a linux container.
+node_modules
+
+# Build artefacts and test output: hundreds of megabytes the build discards.
+.next
+coverage
+test-results
+playwright-report
+tsconfig.tsbuildinfo
+.swc
+
+.git
+.env*.local
