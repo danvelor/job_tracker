@@ -54,6 +54,7 @@ job_tracker/
 │   └── normalization.md       part 4.3: denormalization vs integration events
 ├── backend/
 │   ├── JobTracker.sln
+│   ├── Directory.Packages.props                      central pins, incl. the two in D-20
 │   ├── src/
 │   │   ├── Api/JobTracker.Api/                       host and composition root
 │   │   ├── Common/
@@ -75,6 +76,7 @@ job_tracker/
 │   └── tests/
 │       ├── ...Jobs.Domain.UnitTests/
 │       ├── ...Jobs.Application.UnitTests/
+│       ├── ...Billing.Application.UnitTests/         invariants, handler, double delivery
 │       └── JobTracker.ArchitectureTests/
 └── frontend/
     └── src/
@@ -106,6 +108,15 @@ does not, for the reason given in 3.5:
 `IntegrationEvents` references nothing on purpose. It is the module's Open Host
 Service: the only surface another module is allowed to compile against, and it
 stays free of any dependency that could leak a module's internals.
+
+**Jobs has five projects and Billing has three, and both counts are right.** The
+four layers that line 344 names — API, Application, Domain, Infrastructure — are
+what a module with an HTTP surface needs, and deliverable 2 asks for them of
+*the Jobs module* by name. Billing has no HTTP surface, so it has no
+`Presentation` (D-04), and it publishes no contract, so it has no
+`IntegrationEvents` (D-24). Adding either as an empty project would turn a
+count into the requirement, when the requirement is the dependency direction —
+which Billing's three projects obey exactly as Jobs' five do.
 
 ### 3.2 Dependency direction
 
@@ -823,6 +834,7 @@ logs. Distributed tracing is out of scope by decision (D-15).
 |---|---|---|
 | Domain | xUnit, FluentAssertions | Every invariant in `context/prd.md` section 6; valid and invalid transitions; `Address` structural equality including inequality and hash consistency; that `JobPhoto` cannot be added except through the aggregate |
 | Application | xUnit, Moq | Handler orchestration with mocked repository and unit of work; that completion raises `JobCompletedDomainEvent`; that failures return `Result` rather than throwing; validator rules |
+| Billing | xUnit, Moq | `Invoice`'s own invariants; `GenerateInvoiceOnJobCompletedHandler` with a mocked repository; and **the same integration event delivered twice, asserting one invoice** — which is where the idempotency claim of 4.5 is actually proven rather than described |
 | Architecture | NetArchTest | Every rule in section 9; layer dependency direction; no module referencing another's internals; tenant query filter present on all tenant-scoped entities |
 | Frontend behaviour | Jest, React Testing Library | `useCreateJob` reducer transitions and validation; the Server Action call; store selectors; optimistic update and rollback, with `act()` around every state change |
 | Frontend types | `expect-type`, `tsc --noEmit` | `DeepReadonly` over nested objects, arrays, `Map`, `Set` and tuples; `PathKeys` output; `QueryBuilder` narrowing across the chain; that invalid `transitionJob` calls are compile errors |
@@ -836,6 +848,20 @@ while the test run stays green. `tsc --noEmit` is therefore a required CI step,
 not a convenience. Negative assertions ("this must not compile") are written with
 `@ts-expect-error`, which fails the build when the error it expects stops
 occurring.
+
+**Billing is tested, because D-04 is a claim that needs evidence.** That decision
+gave Billing a domain of its own on the grounds that an `Invoice` with invariants
+demonstrates a bounded context that is not anemic. A module whose invariants
+nothing exercises demonstrates the opposite, so `Billing.Application.UnitTests`
+exists to make the claim checkable.
+
+**There is no backend integration-test project, by choice.** Nothing in the
+backend suites verifies the EF mapping — the owned `Address`, the enum stored as
+text, snake_case, the tenant query filter — because the smoke run of 8.1 covers
+all of it against a real PostgreSQL. Adding a third kind of backend test would
+duplicate that coverage and compete with finishing. The cost is honest and worth
+naming: a mistake in the EF configuration surfaces at step 2 of the walkthrough
+rather than at the line that caused it.
 
 **End-to-end runs against the in-memory adapter.** The suite needs no backend and
 no database, so it is fast and deterministic in CI. A single smoke run exercises
@@ -1097,7 +1123,7 @@ that has teeth.
 | Hangfire polling and dispatch | lines 239-241 | 3 — Outbox and Hangfire | 4 |
 | Domain versus integration events (section 4.1) | line 244 | 6 — DDD concepts | 3 |
 | At-least-once rationale (section 4.3) | line 245 | 6 — DDD concepts | 3 |
-| Idempotency, both mechanisms (section 4.5) | line 246 | 3 — Outbox, 6 — SOLID and GRASP | 4 + 5 |
+| Idempotency by constraint, proven by a double-delivery test (4.5, 8) | line 246 | 3 — Outbox, 6 — SOLID and GRASP | 4 + 5 |
 | Schema per module | lines 229, 346 | 4 — Schema design | 4 |
 | Enums as text, snake_case, owned type | lines 230-232 | 4 — Schema design | 4 |
 | Indexing strategy (section 6.3) | lines 265-269 | 4 — Indexing and optimization | 3 |
