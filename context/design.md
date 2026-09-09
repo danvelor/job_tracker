@@ -900,7 +900,7 @@ justified by what is in the files rather than by the instruction to make one.
 | `JobPhoto` | `public sealed`, extends `Entity` | Constructor `internal`, so only the aggregate creates one. The **class** must be public: `Job.Photos` is a public member, and a public member cannot expose an `internal` type (CS0053). Reachability is enforced by the constructor and by the absence of `AddPhoto`, not by the class modifier |
 | `JobCreatedDomainEvent` | `public sealed record` | Job id, assignee id, organization id |
 | `JobCompletedDomainEvent` | `public sealed record` | Job id, customer id, completion timestamp |
-| `JobCancelledDomainEvent` | `public sealed record` | Job id, reason |
+| `JobCancelledDomainEvent` | `public sealed record` | Job id, assignee id (nullable), reason. The assignee is what `FR-12` notifies; nullable because a job cancelled before it was scheduled never reached a crew |
 | `JobCompletedIntegrationEvent` | `public sealed record`, in `Jobs.IntegrationEvents` | Primitives only: job id, customer id, organization id, completed-at, amount basis |
 | `CreateJobCommand` | `public sealed` | Returns `Result<Guid>` |
 | `CreateJobCommandHandler` | `internal sealed` | |
@@ -921,6 +921,7 @@ justified by what is in the files rather than by the instruction to make one.
 | `INotificationSender` | in `Jobs.Application` | Port. Recipient, subject, body in; success or a reason out |
 | `LoggingNotificationSender` | `internal sealed`, in `Jobs.Infrastructure` | Writes one structured log line. Delivery is simulated; the record is not |
 | `NotifyAssigneeOnJobCreatedHandler` | `internal sealed`, in `Jobs.Application` | `FR-8`. Consumes the **domain** event: it never crosses a module boundary |
+| `NotifyAssigneeOnJobCancelledHandler` | `internal sealed`, in `Jobs.Application` | `FR-12`. Consumes the **domain** event, and never crosses a boundary either — the internal event that does real work (D-37) |
 | `NotifyCustomerOnJobCompletedHandler` | `internal sealed`, in `Jobs.Application` | `FR-10`. Consumes the integration event alongside Billing |
 | `JobRepository` | `internal sealed partial`, in `Infrastructure` | Split across `JobRepository.Reads.cs` and `JobRepository.Writes.cs` (line 222) |
 | `JobConfiguration` | `internal sealed` | `IEntityTypeConfiguration<Job>`; owned `Address`, enum as text |

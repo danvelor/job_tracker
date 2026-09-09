@@ -205,7 +205,7 @@ public sealed class PipelineEndToEndTests(PostgresFixture postgres) : IAsyncLife
     }
 
     [Fact]
-    public async Task A_cancelled_job_neither_bills_nor_notifies_the_customer()
+    public async Task A_cancelled_job_tells_the_crew_but_never_bills()
     {
         var created = await _client.PostAsJsonAsync("/api/jobs", AValidJob());
         var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
@@ -215,9 +215,13 @@ public sealed class PipelineEndToEndTests(PostgresFixture postgres) : IAsyncLife
         await DrainUntilQuiet();
 
         // JobCancelledDomainEvent is the second internal-only event
-        // (architecture 4.4). Its consequence is that there is none — which is
-        // only visible as an absence, so it needs a test.
+        // (architecture 4.4), and the pair of assertions is the whole of it:
+        // cancelling does real work — FR-12 tells the crew twice over, once on
+        // assignment and once on the call-off — and none of that work crosses
+        // into Billing. The absence is what needs the test; a passing customer
+        // notification would be the same failure as an invoice.
         (await Invoices(id)).Should().Be(0);
-        (await Recipients()).Should().Equal("J. Ortiz");
+        (await Recipients()).Should().Equal("J. Ortiz", "J. Ortiz");
+        (await Recipients()).Should().NotContain(recipient => recipient.Contains("@"));
     }
 }

@@ -73,6 +73,13 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
         await Context.SaveChangesAsync();
     }
 
+    private async Task CancelTheJob(Guid id)
+    {
+        var job = await new JobRepository(Context).GetByIdAsync(id);
+        job!.Cancel(Now.AddHours(2), "Weather closed the site");
+        await Context.SaveChangesAsync();
+    }
+
     private Task ResetProcessedOn() =>
         Context.Database.ExecuteSqlAsync($"update jobs.outbox_messages set processed_on = null");
 
@@ -408,5 +415,105 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
                 await publish.Handle(completed, cancellationToken);
             }
         }
+    }
+
+    // ---- FR-12 -----------------------------------------------------------
+
+    [Fact]
+    public async Task Cancelling_a_job_notifies_the_assignee()
+    {
+        var job = Seed();
+        await Context.SaveChangesAsync();
+        await Drain();
+        await CancelTheJob(job.Id);
+
+        await DrainCancellations();
+
+        // Two rows for one recipient: the unique constraint is keyed on the
+        // source event as well as the name, so the crew can be told twice
+        // about the same job for two different reasons.
+        var cancellation = await Context.Notifications.AsNoTracking()
+            .SingleAsync(notification => notification.Subject.Contains("cancelled"));
+        cancellation.Recipient.Should().Be("J. Ortiz");
+        cancellation.Status.Should().Be(NotificationStatus.Pending);
+    }
+
+    [Fact]
+    public async Task The_cancellation_notification_carries_the_reason()
+    {
+        var job = Seed();
+        await Context.SaveChangesAsync();
+        await Drain();
+        await CancelTheJob(job.Id);
+
+        await DrainCancellations();
+
+        // BR-5 makes the reason mandatory so a cancellation can be reviewed
+        // later. The crew is the first reviewer, and a message that withheld
+        // it would send them looking for the answer elsewhere.
+        var cancellation = await Context.Notifications.AsNoTracking()
+            .SingleAsync(notification => notification.Subject.Contains("cancelled"));
+        cancellation.Body.Should().Contain("Ridge tile replacement");
+        cancellation.Body.Should().Contain("Weather closed the site");
+    }
+
+    [Fact]
+    public async Task A_replayed_cancellation_does_not_notify_twice()
+    {
+        var job = Seed();
+        await Context.SaveChangesAsync();
+        await Drain();
+        await CancelTheJob(job.Id);
+        await DrainCancellations();
+        await ResetProcessedOn();
+
+        await DrainCancellations();
+
+        (await Context.Notifications.CountAsync()).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task A_cancellation_with_no_crew_assigned_notifies_nobody()
+    {
+        var job = Seed();
+        await Context.SaveChangesAsync();
+        await Drain();
+        await Context.Database.ExecuteSqlAsync($"update jobs.jobs set assignee_id = null");
+        await CancelTheJob(job.Id);
+
+        await DrainCancellations();
+
+        // A Draft job never reached a crew, so there is nobody to tell. The
+        // handler returns quietly rather than leaving the outbox row to be
+        // retried for ever against an assignee that will never exist.
+        (await Context.Notifications.CountAsync()).Should().Be(1);
+    }
+
+    private async Task DrainCancellations()
+    {
+        var handler = new NotifyAssigneeOnJobCancelledHandler(
+            new NotificationRepository(Context), new PartyRepository(Context),
+            new JobRepository(Context), _queue, new UnitOfWork(Context), TimeProvider.System);
+
+        var processor = new OutboxProcessor(
+            Context, new CancellationPublisher(handler), Tenant, _queue, TimeProvider.System,
+            Options.Create(new OutboxOptions()));
+
+        await processor.DrainAsync(default);
+        Context.ChangeTracker.Clear();
+    }
+
+    private sealed class CancellationPublisher(
+        INotificationHandler<JobCancelledDomainEvent> handler) : IPublisher
+    {
+        public Task Publish(object notification, CancellationToken cancellationToken = default) =>
+            Publish((INotification)notification, cancellationToken);
+
+        public Task Publish<TNotification>(
+            TNotification notification, CancellationToken cancellationToken = default)
+            where TNotification : INotification =>
+            notification is JobCancelledDomainEvent cancelled
+                ? handler.Handle(cancelled, cancellationToken)
+                : Task.CompletedTask;
     }
 }

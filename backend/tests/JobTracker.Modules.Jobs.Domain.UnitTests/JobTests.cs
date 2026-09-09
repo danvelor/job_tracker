@@ -187,6 +187,21 @@ public sealed class JobTests
             .Which.Should().BeOfType<JobCancelledDomainEvent>();
     }
 
+    [Fact]
+    public void The_cancellation_event_carries_the_assignee_who_must_be_told()
+    {
+        // FR-12. The handler notifies the crew, and an event that named only
+        // the job would make it reload the aggregate to find out whom.
+        var job = AScheduledJob();
+        job.ClearDomainEvents();
+
+        job.Cancel(Now.AddHours(1), "Weather");
+
+        job.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<JobCancelledDomainEvent>()
+            .Which.AssigneeId.Should().Be(Assignee);
+    }
+
     // ---- BR-2, terminal states -------------------------------------------
 
     [Fact]

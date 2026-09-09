@@ -68,7 +68,7 @@ That is what lets the browser suite run with neither backend nor database.
 ## Verify it
 
 ```bash
-# Backend: 305 tests — domain, application, architecture, integration
+# Backend: 310 tests — domain, application, architecture, integration
 dotnet test backend/JobTracker.sln
 
 # Frontend: 230 tests, with an 80% coverage gate that fails the run
@@ -153,7 +153,7 @@ The full diagram, plus SOLID, GRASP, GoF and DDD analysis, is in
 
 ## Decisions and trade-offs
 
-Thirty-six decisions are recorded with their alternatives, rationale and cost
+Thirty-seven decisions are recorded with their alternatives, rationale and cost
 in [`context/architecture.md` §11](context/architecture.md). The ones a reviewer
 is most likely to want explained:
 
@@ -197,6 +197,36 @@ organization's rows, and architecture tests fail the build if a tenant-scoped
 entity has no filter. Background work declares its tenant explicitly, which is
 a thing the Compose stack taught us rather than something we knew (D-30, D-35,
 D-36).
+
+---
+
+## Assumptions
+
+**Cancelling a job notifies the crew. The assessment does not ask for this.**
+It requires `JobCancelledDomainEvent` to be raised (line 175) and never gives
+it a consumer: only creation and completion are said to notify (lines 188-189).
+We read that omission as a gap rather than a rule. A crew that learns of a
+cancellation by arriving on site has learned too late, and `BR-5` already
+forces a reason to exist for them to read — so `FR-12` notifies the assignee,
+with the reason, down the same outbox path as `FR-8`.
+
+The crew and not the customer, because the reason is written for internal
+review and is not always the customer's business. A job cancelled before it was
+ever assigned notifies nobody.
+
+It also sharpens the argument the assessment *does* ask for (line 244).
+Cancelling now does real work and still never leaves the module, which settles
+what sends an event across a boundary: another module needing it, not the event
+having consequences. Beforehand cancellation was an internal event with no
+consumer at all, and "internal" could be read as "nothing happens". Recorded as
+D-37, and the end-to-end test asserts that cancelling tells the crew and still
+never bills.
+
+**One organization is seeded, and the rosters are fixed.** Crew and customer
+administration is out of scope, so both are read-only rosters seeded by
+migration. Tenant isolation is enforced and tested against a second
+organization, but only one is reachable through the interface — see the first
+item under *What I would improve* below.
 
 ---
 
