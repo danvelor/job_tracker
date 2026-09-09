@@ -204,4 +204,37 @@ public sealed class LayerRules : ArchitectureTestBase
 
         members.Should().BeEmpty();
     }
+
+    [Fact]
+    public void Billing_cannot_see_the_Jobs_domain()
+    {
+        // Architecture 3.5's whole claim, and what stops it from being an
+        // aspiration. Billing learns a job completed from a record of
+        // primitives; anything more would be the coupling the boundary exists
+        // to prevent.
+        var references = ProjectReferencesOf("Modules/Billing/JobTracker.Modules.Billing.Application");
+
+        references.Should().Contain("JobTracker.Modules.Jobs.IntegrationEvents");
+        references.Should().NotContain("JobTracker.Modules.Jobs.Domain");
+        references.Should().NotContain("JobTracker.Modules.Jobs.Application");
+        references.Should().NotContain("JobTracker.Modules.Jobs.Infrastructure");
+    }
+
+    [Fact]
+    public void Billings_domain_sees_only_the_shared_kernel()
+    {
+        ProjectReferencesOf("Modules/Billing/JobTracker.Modules.Billing.Domain")
+            .Should().BeEquivalentTo(["JobTracker.Common.Domain"]);
+    }
+
+    [Fact]
+    public void Billing_does_not_use_a_Jobs_type_even_transitively()
+    {
+        // The project graph forbids the reference; this catches a type that
+        // arrived some other way — through the shared kernel, or through a
+        // package both happen to pull.
+        var subject = Types.InAssembly(BillingApplication);
+
+        ShouldHold(subject.ShouldNot().HaveDependencyOn("JobTracker.Modules.Jobs.Domain"), subject);
+    }
 }

@@ -3,6 +3,7 @@ using JobTracker.Api;
 using JobTracker.Api.Authentication;
 using JobTracker.Common.Infrastructure;
 using JobTracker.Common.Presentation;
+using JobTracker.Modules.Billing.Infrastructure;
 using JobTracker.Modules.Jobs.Infrastructure;
 using JobTracker.Modules.Jobs.Presentation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -42,6 +43,11 @@ builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
 builder.Services.AddSingleton<TokenIssuer>();
 
 builder.Services.AddJobsModule(
+    builder.Configuration.GetConnectionString("Database")
+    ?? throw new InvalidOperationException("ConnectionStrings:Database is required."),
+    builder.Configuration);
+
+builder.Services.AddBillingModule(
     builder.Configuration.GetConnectionString("Database")
     ?? throw new InvalidOperationException("ConnectionStrings:Database is required."),
     builder.Configuration);
