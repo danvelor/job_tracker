@@ -16,4 +16,13 @@
     <PackageReference Include="MediatR" />
     <PackageReference Include="FluentValidation" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Handlers are internal because nothing outside the module may invoke
+         one directly; MediatR resolves them by contract (architecture 9.1).
+         That modifier is doing real work, so it stays — and the unit tests get
+         an explicit grant rather than the handlers being widened to public for
+         the convenience of the test project. -->
+    <InternalsVisibleTo Include="JobTracker.Modules.Jobs.Application.UnitTests" />
+  </ItemGroup>
 </Project>
