@@ -46,12 +46,13 @@ export function useJobsPage(
   const start = useStartJob();
   const cancel = useCancelJob();
   const complete = useCompleteJob();
-  const { sortConfig, pageSize, selectedJobIds, toggleSelection } = useJobsUiStore(
+  const { sortConfig, pageSize, selectedJobIds, toggleSelection, setSort } = useJobsUiStore(
     useShallow((state) => ({
       sortConfig: state.sortConfig,
       pageSize: state.pageSize,
       selectedJobIds: state.selectedJobIds,
       toggleSelection: state.toggleSelection,
+      setSort: state.setSort,
     })),
   );
 
@@ -124,6 +125,8 @@ export function useJobsPage(
     complete,
     hasMore,
     loadMore,
+    sortField: sortConfig.field,
+    onSort: setSort,
     selectedCount: selectedJobIds.length,
     hasActiveFilter: filter.hasActiveFilter,
     isLoading,

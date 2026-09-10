@@ -71,14 +71,14 @@ That is what lets the browser suite run with neither backend nor database.
 # Backend: 313 tests — domain, application, architecture, integration
 dotnet test backend/JobTracker.sln
 
-# Frontend: 246 tests, with an 80% coverage gate that fails the run
+# Frontend: 251 tests, with an 80% coverage gate that fails the run
 npm --prefix frontend run test:coverage
 
 # Types. Separate on purpose: expect-type assertions fail at compile time,
 # so a broken type test leaves Jest green
 npm --prefix frontend run typecheck
 
-# Browser: 18 tests. Fourteen against the in-memory adapter, and four against a
+# Browser: 21 tests. Seventeen against the in-memory adapter, and four against a
 # second server whose API url points nowhere — the only faithful way to reach
 # app/jobs/error.tsx, since the failure happens in the Server Component render
 npm --prefix frontend run test:e2e

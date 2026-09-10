@@ -12,7 +12,7 @@ export type JobFilters = {
   assigneeId: string | null;
 };
 
-export type SortConfig = { field: JobSortField; direction: 'asc' | 'desc' };
+export type SortConfig = { field: JobSortField };
 
 export type JobsUiState = DeepReadonly<{
   filters: JobFilters;
@@ -27,7 +27,7 @@ export type JobsUiActions = {
   setFilter: (patch: Partial<JobFilters>) => void;
   clearFilters: () => void;
   setPageSize: (pageSize: number) => void;
-  setSort: (field: JobSortField, direction: 'asc' | 'desc') => void;
+  setSort: (field: JobSortField) => void;
   toggleSelection: (id: string) => void;
   clearSelection: () => void;
   beginOptimistic: (id: string, target: JobStatus, previous: JobStatus) => void;
@@ -49,7 +49,7 @@ export const DEFAULT_PAGE_SIZE = 3;
 const initialState: JobsUiState = {
   filters: DEFAULT_FILTERS,
   pageSize: DEFAULT_PAGE_SIZE,
-  sortConfig: { field: 'scheduledDate', direction: 'desc' },
+  sortConfig: { field: 'scheduledDate' },
   selectedJobIds: [],
   optimisticStatus: {},
   rollbackSnapshot: {},
@@ -71,7 +71,7 @@ export const useJobsUiStore = create<JobsUiState & JobsUiActions>()((set) => ({
 
   setPageSize: (pageSize) => set({ pageSize }),
 
-  setSort: (field, direction) => set({ sortConfig: { field, direction } }),
+  setSort: (field) => set({ sortConfig: { field } }),
 
   toggleSelection: (id) =>
     set((state) => ({

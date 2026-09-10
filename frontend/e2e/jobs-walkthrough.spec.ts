@@ -84,6 +84,49 @@ test.describe('jobs walkthrough', () => {
     await expect(jobs.row('job-4')).toBeVisible();
   });
 
+  test('ordering by title brings up a job the date order left on page two', async ({
+    page,
+  }) => {
+    const jobs = new JobsPage(page);
+    await jobs.goto();
+    await jobs.waitForList();
+
+    await expect(jobs.row('job-4')).toHaveCount(0);
+
+    await jobs.sortBy('title').click();
+
+    await expect(jobs.rows.first()).toHaveText('Flashing inspection');
+    await expect(jobs.row('job-4')).toBeVisible();
+  });
+
+  test('ordering by date again puts the newest first', async ({ page }) => {
+    const jobs = new JobsPage(page);
+    await jobs.goto();
+    await jobs.waitForList();
+
+    await jobs.sortBy('title').click();
+    await expect(jobs.rows.first()).toHaveText('Flashing inspection');
+
+    await jobs.sortBy('scheduledDate').click();
+
+    await expect(jobs.rows.first()).toHaveText('Ridge tile replacement');
+  });
+
+  test('the ordered column says so to a screen reader', async ({ page }) => {
+    const jobs = new JobsPage(page);
+    await jobs.goto();
+    await jobs.waitForList();
+
+    await jobs.sortBy('title').click();
+
+    await expect(
+      page.locator('th', { has: jobs.sortBy('title') }),
+    ).toHaveAttribute('aria-sort', 'ascending');
+    await expect(
+      page.locator('th', { has: jobs.sortBy('scheduledDate') }),
+    ).toHaveAttribute('aria-sort', 'none');
+  });
+
   test('a filter that matches nothing says so, and says the right thing', async ({
     page,
   }) => {
