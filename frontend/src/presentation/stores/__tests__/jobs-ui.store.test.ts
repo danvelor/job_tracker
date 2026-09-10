@@ -1,9 +1,11 @@
 import type { JobSummary } from '@/core/domain/job/job-summary.type';
 import {
+  DEFAULT_PAGE_SIZE,
   makeVisibleJobsSelector,
   selectFilters,
   selectIsSelected,
   selectOptimisticStatus,
+  selectPageSize,
   useJobsUiStore,
 } from '../jobs-ui.store';
 
@@ -32,13 +34,22 @@ describe('useJobsUiStore', () => {
     expect(Object.keys(useJobsUiStore.getState())).not.toContain('jobs');
   });
 
-  it('merges a filter patch and resets the cursor', () => {
-    useJobsUiStore.getState().setCursor('job-2');
+  it('merges a filter patch', () => {
     useJobsUiStore.getState().setFilter({ text: 'ridge' });
 
-    const state = useJobsUiStore.getState();
-    expect(selectFilters(state).text).toBe('ridge');
-    expect(state.cursor).toBeNull();
+    expect(selectFilters(useJobsUiStore.getState()).text).toBe('ridge');
+  });
+
+  it('holds the page size, which is how much a load-more step asks for', () => {
+    expect(selectPageSize(useJobsUiStore.getState())).toBe(DEFAULT_PAGE_SIZE);
+
+    useJobsUiStore.getState().setPageSize(25);
+
+    expect(selectPageSize(useJobsUiStore.getState())).toBe(25);
+  });
+
+  it('holds no cursor, because which pages are loaded belongs to SWR', () => {
+    expect(Object.keys(useJobsUiStore.getState())).not.toContain('cursor');
   });
 
   it('keeps filter fields the patch did not mention', () => {
@@ -50,9 +61,8 @@ describe('useJobsUiStore', () => {
     expect(filters.assigneeId).toBe('assignee-2');
   });
 
-  it('clearFilters restores the defaults and resets the cursor', () => {
+  it('clearFilters restores the defaults', () => {
     useJobsUiStore.getState().setFilter({ text: 'ridge', statuses: ['Completed'] });
-    useJobsUiStore.getState().setCursor('job-2');
     useJobsUiStore.getState().clearFilters();
 
     const state = useJobsUiStore.getState();
@@ -63,16 +73,15 @@ describe('useJobsUiStore', () => {
       scheduledTo: null,
       assigneeId: null,
     });
-    expect(state.cursor).toBeNull();
   });
 
-  it('setSort replaces the config and resets the cursor', () => {
-    useJobsUiStore.getState().setCursor('job-2');
+  it('setSort replaces the config', () => {
     useJobsUiStore.getState().setSort('title', 'asc');
 
-    const state = useJobsUiStore.getState();
-    expect(state.sortConfig).toEqual({ field: 'title', direction: 'asc' });
-    expect(state.cursor).toBeNull();
+    expect(useJobsUiStore.getState().sortConfig).toEqual({
+      field: 'title',
+      direction: 'asc',
+    });
   });
 
   it('toggles selection on and off', () => {

@@ -45,9 +45,12 @@ internal sealed partial class JobRepository
 
         query = await ApplyCursorAsync(query, criteria, cancellationToken);
 
-        return await query
-            .OrderByDescending(job => job.ScheduledDate ?? EF.Constant(DateOnly.MinValue))
-            .ThenByDescending(job => job.Id)
+        var ordered = criteria.Sort == JobSortField.Title
+            ? query.OrderBy(job => job.Title).ThenBy(job => job.Id)
+            : query.OrderByDescending(job => job.ScheduledDate ?? EF.Constant(DateOnly.MinValue))
+                .ThenByDescending(job => job.Id);
+
+        return await ordered
             .Take(criteria.Limit)
             .Select(job => new JobSearchResult(
                 job.Id,
@@ -72,6 +75,20 @@ internal sealed partial class JobRepository
         if (!Guid.TryParse(criteria.Cursor, out var cursorId))
         {
             return query;
+        }
+
+        if (criteria.Sort == JobSortField.Title)
+        {
+            var titleAnchor = await context.Jobs.AsNoTracking()
+                .Where(job => job.Id == cursorId)
+                .Select(job => new { job.Title, job.Id })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            return titleAnchor is null
+                ? query
+                : query.Where(job =>
+                    string.Compare(job.Title, titleAnchor.Title) > 0
+                    || (job.Title == titleAnchor.Title && job.Id > titleAnchor.Id));
         }
 
         var anchor = await context.Jobs.AsNoTracking()

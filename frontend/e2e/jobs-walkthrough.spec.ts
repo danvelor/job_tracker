@@ -44,6 +44,46 @@ test.describe('jobs walkthrough', () => {
     await expect(jobs.row('job-2')).toBeVisible();
   });
 
+  test('the list pages: the fourth job arrives only when more is asked for', async ({
+    page,
+  }) => {
+    const jobs = new JobsPage(page);
+    await jobs.goto();
+    await jobs.waitForList();
+
+    await expect(jobs.rows).toHaveCount(3);
+    await expect(jobs.row('job-4')).toHaveCount(0);
+
+    await jobs.loadMore.click();
+
+    await expect(jobs.rows).toHaveCount(4);
+    await expect(jobs.row('job-4')).toBeVisible();
+  });
+
+  test('the control disappears once the last page is in', async ({ page }) => {
+    const jobs = new JobsPage(page);
+    await jobs.goto();
+    await jobs.waitForList();
+
+    await jobs.loadMore.click();
+    await expect(jobs.rows).toHaveCount(4);
+
+    await expect(jobs.loadMore).toHaveCount(0);
+  });
+
+  test('paging keeps the rows already on screen rather than replacing them', async ({
+    page,
+  }) => {
+    const jobs = new JobsPage(page);
+    await jobs.goto();
+    await jobs.waitForList();
+
+    await jobs.loadMore.click();
+
+    await expect(jobs.row('job-1')).toBeVisible();
+    await expect(jobs.row('job-4')).toBeVisible();
+  });
+
   test('a filter that matches nothing says so, and says the right thing', async ({
     page,
   }) => {

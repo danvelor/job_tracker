@@ -682,7 +682,7 @@ type JobsUiState = DeepReadonly<{
     scheduledTo: string | null;
     assigneeId: string | null;
   };
-  cursor: string | null;
+  pageSize: number;
   sortConfig: { field: JobSortField; direction: 'asc' | 'desc' };   // see D-18
   selectedJobIds: string[];
   optimisticStatus: Record<string, JobStatus>;
@@ -692,9 +692,13 @@ type JobsUiState = DeepReadonly<{
 
 where `type JobSortField = 'scheduledDate' | 'title'`.
 
-Note what is **absent**: there is no `jobs` array. Rows belong to SWR
-(`context/architecture.md` D-05). `DeepReadonly` on the state type means a
-selector's consumer cannot mutate what it was handed.
+Note what is **absent**: there is no `jobs` array, and no cursor. Rows belong to
+SWR (`context/architecture.md` D-05), and so does the record of which pages have
+been loaded — `useSWRInfinite` derives each page's cursor from the one before
+it, so a second copy in the store could only drift from it (D-40). What the
+store owns of pagination is `pageSize`, which is a preference rather than a
+position. `DeepReadonly` on the state type means a selector's consumer cannot
+mutate what it was handed.
 
 `JobSortField` is a closed union rather than `PathKeys<JobSummary>` because the
 keyset cursor has to order by the same key the query does, and every sortable
@@ -706,10 +710,10 @@ draft are contradictory, so every action returns a new object.
 
 | Action | Effect |
 |---|---|
-| `setFilter(patch)` | Merges filter fields, resets `cursor` to `null` |
-| `clearFilters()` | Restores defaults, resets `cursor` |
-| `setCursor(cursor)` | Advances paging |
-| `setSort(field, direction)` | Replaces `sortConfig`, resets `cursor` — the ordering key changed, so the old cursor is meaningless |
+| `setFilter(patch)` | Merges filter fields |
+| `clearFilters()` | Restores defaults |
+| `setPageSize(size)` | How many rows a page asks for |
+| `setSort(field, direction)` | Replaces `sortConfig` |
 | `toggleSelection(id)` / `clearSelection()` | Selection |
 | `beginOptimistic(id, target, previous)` | Writes `optimisticStatus[id]` and `rollbackSnapshot[id]` |
 | `commitOptimistic(id)` | Drops both entries; the row reverts to server ownership |
@@ -938,7 +942,7 @@ parameter, because accepting one would invite forging it.
 | Method | Route | Body | Success | Failures |
 |---|---|---|---|---|
 | `POST` | `/api/jobs` | `CreateJobRequest` | `201` + `{ id }` | `400` validation, `409` invariant, `401` |
-| `GET` | `/api/jobs` | query string: `text`, `statuses`, `scheduledFrom`, `scheduledTo`, `assigneeId`, `cursor`, `limit` | `200` + `{ items, nextCursor }` | `400`, `401` |
+| `GET` | `/api/jobs` | query string: `text`, `statuses`, `scheduledFrom`, `scheduledTo`, `assigneeId`, `sort`, `cursor`, `limit` | `200` + `{ items, nextCursor }` | `400`, `401` |
 | `GET` | `/api/jobs/{id}` | — | `200` + `JobDetailResponse` | `404`, `401` |
 | `POST` | `/api/jobs/{id}/start` | — | `204` | `404`, `409`, `401` |
 | `POST` | `/api/jobs/{id}/complete` | `CompleteJobRequest` | `204` | `400`, `404`, `409`, `401` |

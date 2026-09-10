@@ -16,7 +16,7 @@ export type SortConfig = { field: JobSortField; direction: 'asc' | 'desc' };
 
 export type JobsUiState = DeepReadonly<{
   filters: JobFilters;
-  cursor: string | null;
+  pageSize: number;
   sortConfig: SortConfig;
   selectedJobIds: string[];
   optimisticStatus: Record<string, JobStatus>;
@@ -26,7 +26,7 @@ export type JobsUiState = DeepReadonly<{
 export type JobsUiActions = {
   setFilter: (patch: Partial<JobFilters>) => void;
   clearFilters: () => void;
-  setCursor: (cursor: string | null) => void;
+  setPageSize: (pageSize: number) => void;
   setSort: (field: JobSortField, direction: 'asc' | 'desc') => void;
   toggleSelection: (id: string) => void;
   clearSelection: () => void;
@@ -44,9 +44,11 @@ const DEFAULT_FILTERS: JobFilters = {
   assigneeId: null,
 };
 
+export const DEFAULT_PAGE_SIZE = 3;
+
 const initialState: JobsUiState = {
   filters: DEFAULT_FILTERS,
-  cursor: null,
+  pageSize: DEFAULT_PAGE_SIZE,
   sortConfig: { field: 'scheduledDate', direction: 'desc' },
   selectedJobIds: [],
   optimisticStatus: {},
@@ -63,13 +65,13 @@ export const useJobsUiStore = create<JobsUiState & JobsUiActions>()((set) => ({
   ...initialState,
 
   setFilter: (patch) =>
-    set((state) => ({ filters: { ...state.filters, ...patch }, cursor: null })),
+    set((state) => ({ filters: { ...state.filters, ...patch } })),
 
-  clearFilters: () => set({ filters: DEFAULT_FILTERS, cursor: null }),
+  clearFilters: () => set({ filters: DEFAULT_FILTERS }),
 
-  setCursor: (cursor) => set({ cursor }),
+  setPageSize: (pageSize) => set({ pageSize }),
 
-  setSort: (field, direction) => set({ sortConfig: { field, direction }, cursor: null }),
+  setSort: (field, direction) => set({ sortConfig: { field, direction } }),
 
   toggleSelection: (id) =>
     set((state) => ({
@@ -111,7 +113,7 @@ export const selectFilters = (state: JobsUiState): JobsUiState['filters'] => sta
 export const selectSortConfig = (state: JobsUiState): JobsUiState['sortConfig'] =>
   state.sortConfig;
 
-export const selectCursor = (state: JobsUiState): string | null => state.cursor;
+export const selectPageSize = (state: JobsUiState): number => state.pageSize;
 
 export const selectSelectedIds = (state: JobsUiState): readonly string[] =>
   state.selectedJobIds;

@@ -81,6 +81,10 @@ export class JobsPage {
       .waitFor({ state: 'visible' });
   }
 
+  get loadMore(): Locator {
+    return this.page.getByTestId('jobs-load-more');
+  }
+
   get newJobButton(): Locator {
     return this.page.getByTestId('jobs-new-button');
   }

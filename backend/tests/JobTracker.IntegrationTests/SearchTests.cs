@@ -20,9 +20,10 @@ public sealed class SearchTests(PostgresFixture postgres) : IntegrationTestBase(
         string? cursor = null,
         string? text = null,
         IReadOnlyList<JobStatus>? statuses = null,
-        Guid? assigneeId = null) =>
+        Guid? assigneeId = null,
+        JobSortField sort = JobSortField.ScheduledDate) =>
         new(Organization, text, statuses, null, null, assigneeId,
-            JobSortField.ScheduledDate, cursor, limit);
+            sort, cursor, limit);
 
     private async Task Seed(params (string Title, string? Description, DateOnly Date)[] jobs)
     {
@@ -69,6 +70,52 @@ public sealed class SearchTests(PostgresFixture postgres) : IntegrationTestBase(
 
         first.Select(row => row.Title).Should().Equal("A", "B");
         second.Select(row => row.Title).Should().Equal("C", "D");
+    }
+
+    [Fact]
+    public async Task Sorting_by_title_orders_alphabetically_rather_than_by_date()
+    {
+        await Seed(
+            ("Zinc flashing", null, new DateOnly(2099, 6, 1)),
+            ("Apex ridge", null, new DateOnly(2099, 1, 1)));
+
+        var rows = await Repository().SearchAsync(Criteria(sort: JobSortField.Title));
+
+        rows.Select(row => row.Title).Should().Equal("Apex ridge", "Zinc flashing");
+    }
+
+    [Fact]
+    public async Task Successive_title_pages_are_disjoint_and_complete()
+    {
+        await Seed(
+            ("Apex ridge", null, new DateOnly(2099, 1, 1)),
+            ("Barge board", null, new DateOnly(2099, 5, 1)),
+            ("Chimney flaunching", null, new DateOnly(2099, 2, 1)),
+            ("Dormer cheek", null, new DateOnly(2099, 4, 1)));
+
+        var first = await Repository().SearchAsync(Criteria(limit: 2, sort: JobSortField.Title));
+        var second = await Repository().SearchAsync(
+            Criteria(limit: 2, cursor: first[^1].Id.ToString(), sort: JobSortField.Title));
+
+        first.Select(row => row.Title).Should().Equal("Apex ridge", "Barge board");
+        second.Select(row => row.Title).Should().Equal("Chimney flaunching", "Dormer cheek");
+    }
+
+    [Fact]
+    public async Task Two_jobs_sharing_a_title_are_neither_skipped_nor_repeated()
+    {
+        await Seed(
+            ("Repitch", null, new DateOnly(2099, 5, 1)),
+            ("Repitch", null, new DateOnly(2099, 4, 1)),
+            ("Repitch", null, new DateOnly(2099, 3, 1)),
+            ("Repitch", null, new DateOnly(2099, 2, 1)));
+
+        var first = await Repository().SearchAsync(Criteria(limit: 2, sort: JobSortField.Title));
+        var second = await Repository().SearchAsync(
+            Criteria(limit: 2, cursor: first[^1].Id.ToString(), sort: JobSortField.Title));
+
+        first.Select(row => row.Id).Should().NotIntersectWith(second.Select(row => row.Id));
+        first.Concat(second).Should().HaveCount(4);
     }
 
     [Fact]
