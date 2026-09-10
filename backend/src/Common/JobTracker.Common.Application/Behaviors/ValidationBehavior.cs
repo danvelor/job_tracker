@@ -4,14 +4,6 @@ using MediatR;
 
 namespace JobTracker.Common.Application.Behaviors;
 
-/// <summary>
-/// The Open/Closed example: validation applies to every handler in every
-/// module and not one handler mentions it. Adding an authorisation behaviour
-/// is a registration, not an edit.
-///
-/// It returns a failed <see cref="Result"/> rather than throwing, because a
-/// validation failure is expected (architecture 9.2).
-/// </summary>
 public sealed class ValidationBehavior<TRequest, TResponse>(
     IEnumerable<IValidator<TRequest>> validators) : IPipelineBehavior<TRequest, TResponse>
     where TRequest : notnull
@@ -33,10 +25,6 @@ public sealed class ValidationBehavior<TRequest, TResponse>(
             return await next();
         }
 
-        // Every broken rule, not the first: telling someone one problem at a
-        // time hides the way forward (design A5 point 3 makes the same case
-        // for the create form). That applies within a field as much as across
-        // them, so the grouping keeps every message rather than the last.
         var fieldErrors = failures
             .GroupBy(failure => failure.PropertyName)
             .ToDictionary(
@@ -51,12 +39,6 @@ public sealed class ValidationBehavior<TRequest, TResponse>(
         return CreateFailure(error);
     }
 
-    /// <summary>
-    /// A plain <c>Result.Failure(error)</c> is not a <c>Result&lt;T&gt;</c>, so
-    /// casting one would throw for any handler returning a value. Reflecting
-    /// the generic factory builds the right shape for both, and the constraint
-    /// guarantees there is no third case.
-    /// </summary>
     private static TResponse CreateFailure(Error error)
     {
         if (typeof(TResponse) == typeof(Result))

@@ -2,7 +2,6 @@ import { SkeletonBlock } from '@/presentation/components/atoms/skeleton-block.co
 
 const ROWS = [0, 1, 2, 3, 4];
 
-/** The Suspense fallback. Five rows, matching design A4. */
 export function JobsTableSkeleton() {
   return (
     <div data-testid="jobs-table-skeleton" className="space-y-2 p-3">

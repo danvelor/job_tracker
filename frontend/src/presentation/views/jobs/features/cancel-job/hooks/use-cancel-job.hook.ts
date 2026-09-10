@@ -9,10 +9,6 @@ import { cancelJobAction } from '../actions/cancel-job.action';
 
 const REASON_REQUIRED = 'A cancellation reason is required';
 
-/**
- * Cancelling collects one value, so design A1 gives it an inline field rather
- * than a modal — and the slice owns which row's field is open.
- */
 export function useCancelJob() {
   const { beginOptimistic, commitOptimistic, rollbackOptimistic } = useJobsUiStore(
     useShallow((state) => ({
@@ -42,9 +38,6 @@ export function useCancelJob() {
       const id = openFor;
       if (id === null) return;
 
-      // BR-5 is checked here as well as in the adapter: once where the user
-      // can be told, and once where it cannot be bypassed. This one runs
-      // before the action is called at all.
       if (reason.trim() === '') {
         setErrors((previous) => ({ ...previous, [id]: REASON_REQUIRED }));
         return;
@@ -68,8 +61,6 @@ export function useCancelJob() {
 
         rollbackOptimistic(id);
         setErrors((previous) => ({ ...previous, [id]: outcome.error.message }));
-        // The field stays open: closing it would discard the typed reason
-        // along with the error that asked the user to reconsider it.
       });
     },
     [openFor, reason, beginOptimistic, commitOptimistic, rollbackOptimistic],

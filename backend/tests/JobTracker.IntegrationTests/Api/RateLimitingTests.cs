@@ -6,19 +6,9 @@ using Microsoft.AspNetCore.Hosting;
 
 namespace JobTracker.IntegrationTests.Api;
 
-/// <summary>
-/// Architecture 7.4. Partitioned by the <c>org</c> claim, because a global
-/// limiter would let one noisy organization deny service to every other one —
-/// a multi-tenancy failure wearing a performance costume.
-/// </summary>
 [Collection(PostgresCollection.Name)]
 public sealed class RateLimitingTests(PostgresFixture postgres) : IAsyncLifetime
 {
-    /// <summary>
-    /// Low limits from configuration. A test that had to send the production
-    /// allowance would take minutes and would be the first thing anyone
-    /// disabled.
-    /// </summary>
     private sealed class LimitedApiFactory(string connectionString, int permitLimit)
         : ApiFactory(connectionString)
     {
@@ -70,8 +60,6 @@ public sealed class RateLimitingTests(PostgresFixture postgres) : IAsyncLifetime
 
         var response = await client.GetAsync("/api/jobs?limit=1");
 
-        // The limiter has to permit the normal case, or the test above would
-        // pass against an API that refused everything.
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -82,8 +70,6 @@ public sealed class RateLimitingTests(PostgresFixture postgres) : IAsyncLifetime
 
         var response = await Exhaust(client, attempts: 6);
 
-        // 429 without Retry-After tells a client to back off by an amount it
-        // has to guess, and clients guess badly — usually by retrying at once.
         response.Headers.RetryAfter.Should().NotBeNull();
     }
 
@@ -96,17 +82,12 @@ public sealed class RateLimitingTests(PostgresFixture postgres) : IAsyncLifetime
         await Exhaust(ours, attempts: 6);
         var theirResponse = await theirs.GetAsync("/api/jobs?limit=1");
 
-        // The partition is the whole point of 7.4. Without it the loudest
-        // tenant sets everyone else's availability.
         theirResponse.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
     public async Task An_unauthenticated_caller_is_partitioned_by_address_rather_than_pooled()
     {
-        // No claim to partition by, and a single shared bucket for every
-        // anonymous caller would mean one of them could lock out the token
-        // endpoint for all of them.
         var client = _api.CreateClient();
 
         var response = await client.PostAsync("/auth/dev-token",
@@ -119,9 +100,6 @@ public sealed class RateLimitingTests(PostgresFixture postgres) : IAsyncLifetime
     [Fact]
     public async Task The_health_endpoint_needs_no_token()
     {
-        // Compose polls it before the container has any credentials. A
-        // healthcheck that needed a token would never turn the container
-        // healthy, and the stack would never come up.
         var response = await _api.CreateClient().GetAsync("/health");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -136,9 +114,5 @@ public sealed class RateLimitingTests(PostgresFixture postgres) : IAsyncLifetime
         {
             (await client.GetAsync("/health")).StatusCode.Should().Be(HttpStatusCode.OK);
         }
-
-        // Compose polls every three seconds. A limiter that counted those would
-        // mark the container unhealthy under its own healthcheck — the system
-        // failing because it was watching itself.
     }
 }

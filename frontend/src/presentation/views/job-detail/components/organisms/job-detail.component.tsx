@@ -3,19 +3,6 @@ import type { JobState } from '@/core/domain/job';
 import type { JobDetail } from '@/core/domain/job/job-summary.type';
 import { StatusBadge } from '@/presentation/components/atoms/status-badge.component';
 
-/**
- * A faithful conversion: every field the state needs is present on JobDetail,
- * so nothing is invented. That is why the summary lives here and not on the
- * list row, whose JobSummary carries no timestamps, no signature and no
- * photos — a row calling getJobSummary would have to fabricate all three.
- */
-/**
- * A timestamp the status guarantees: the aggregate records startedAt when a job
- * starts and completedAt when it completes. A missing one is a contradiction in
- * the data rather than a case to render, and the epoch is a visibly wrong
- * answer — better than substituting the scheduled date, which would look
- * plausible and be read as fact.
- */
 const stamped = (value: string | null): Date => new Date(value ?? 0);
 
 function toState(job: JobDetail): JobState {
@@ -24,9 +11,6 @@ function toState(job: JobDetail): JobState {
       return { status: 'Draft' };
 
     case 'Scheduled':
-      // A Scheduled job with no date is a contradiction the API cannot
-      // produce (D-14). Saying so is better than inventing a date: the
-      // summary then reads as what the row actually is.
       return job.scheduledDate === null
         ? { status: 'Draft', notes: 'no scheduled date recorded' }
         : {
@@ -62,7 +46,6 @@ function toState(job: JobDetail): JobState {
   }
 }
 
-/** A thin shell: props in, markup out. */
 export function JobDetailView({ job }: { readonly job: JobDetail }) {
   return (
     <article data-testid="job-detail" className="p-6">

@@ -33,8 +33,6 @@ public sealed class ResultTests
 
         var read = () => result.Value;
 
-        // The caller did not check IsSuccess. That is a programming mistake,
-        // not an expected failure, so an exception is the right answer.
         read.Should().Throw<InvalidOperationException>();
     }
 

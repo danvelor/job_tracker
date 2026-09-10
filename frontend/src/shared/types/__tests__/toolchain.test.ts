@@ -12,8 +12,6 @@ describe('toolchain', () => {
 
   it('has strictNullChecks on', () => {
     // @ts-expect-error null is not assignable to string under strict.
-    // This fails the build if anyone turns strict off, which is what makes
-    // the assertion worth having rather than decorative.
     const value: string = null;
     expect(value).toBeNull();
   });

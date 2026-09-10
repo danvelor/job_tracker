@@ -10,7 +10,6 @@ namespace JobTracker.Modules.Jobs.Presentation.Jobs;
 
 internal sealed class SearchJobs : IEndpoint
 {
-    /// <summary>The one endpoint with parsing to do, and the only place it belongs.</summary>
     internal sealed record Query(
         [FromQuery] string? Text,
         [FromQuery] string[]? Statuses,
@@ -33,9 +32,6 @@ internal sealed class SearchJobs : IEndpoint
             {
                 if (!TryParseStatuses(query.Statuses, out var statuses))
                 {
-                    // A typo is a contract violation, not an empty result set.
-                    // An empty list would read as "no jobs match", which is a
-                    // different and wrong answer.
                     return Results.Problem(
                         title: "Unknown status",
                         detail: "Every value of `statuses` must be a defined job status.",
@@ -53,8 +49,6 @@ internal sealed class SearchJobs : IEndpoint
                         query.AssigneeId,
                         query.Sort == "title" ? JobSortField.Title : JobSortField.ScheduledDate,
                         query.Cursor,
-                        // A caller asking for ten thousand rows gets fifty.
-                        // NFR-5 is not enforceable if the page size is not.
                         Math.Clamp(query.Limit ?? DefaultLimit, 1, MaxLimit)),
                     cancellationToken);
 
@@ -76,9 +70,6 @@ internal sealed class SearchJobs : IEndpoint
 
         foreach (var value in raw)
         {
-            // Case-sensitive on purpose: the wire format is the enum's name,
-            // and accepting "completed" here while the schema stores
-            // "Completed" would make two spellings of one thing.
             if (!Enum.TryParse<JobStatus>(value, ignoreCase: false, out var status))
             {
                 return false;

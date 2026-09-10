@@ -5,7 +5,6 @@ using MediatR;
 
 namespace JobTracker.Modules.Jobs.Presentation.Parties;
 
-/// <summary>Read-only (D-26). There is no POST, and that is the design.</summary>
 internal sealed class ListAssignees : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app) =>

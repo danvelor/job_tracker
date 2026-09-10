@@ -24,8 +24,6 @@ internal sealed class CompleteJob : IEndpoint
                         id,
                         tenant.OrganizationId,
                         request.SignatureUrl,
-                        // An omitted array and an empty one mean the same
-                        // thing here: no photos. BR-4 is about the signature.
                         request.Photos?
                             .Select(photo => new NewPhotoInput(photo.Url, photo.Caption))
                             .ToList() ?? []),

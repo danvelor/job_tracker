@@ -53,8 +53,6 @@ public sealed class AddressTests
     [InlineData(0, -181)]
     public void Coordinates_outside_the_globe_are_refused(decimal latitude, decimal longitude)
     {
-        // An address is a place. A latitude of 91 is not a place, and letting
-        // one through would put a pin in the sea on a map nobody checks.
         Address.Create("12 Elm St", "Springfield", "IL", "62701", latitude, longitude)
             .IsFailure.Should().BeTrue();
     }
@@ -64,8 +62,6 @@ public sealed class AddressTests
     [InlineData(-90, -180)]
     public void The_extremes_of_the_globe_are_accepted(decimal latitude, decimal longitude)
     {
-        // The poles and the antimeridian are places. An off-by-one here would
-        // refuse a real address for being exactly at the boundary.
         Address.Create("12 Elm St", "Springfield", "IL", "62701", latitude, longitude)
             .IsSuccess.Should().BeTrue();
     }

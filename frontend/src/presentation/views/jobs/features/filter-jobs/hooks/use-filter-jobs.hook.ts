@@ -16,10 +16,6 @@ export function useFilterJobs() {
     })),
   );
 
-  // Text is debounced before it reaches the query; every other control applies
-  // immediately (design A5). The store holds the typed value so the input
-  // stays responsive, and this is the value the SWR key uses — so a keystroke
-  // does not become a request.
   const [debouncedText, setDebouncedText] = useState('');
 
   useEffect(() => {
@@ -41,9 +37,6 @@ export function useFilterJobs() {
 
   const setDateRange = useCallback(
     (from: string | null, to: string | null) => {
-      // Design A3 specifies a from <= to guard. An inverted range matches
-      // nothing, which reads as a bug rather than as a filter, so whichever
-      // bound the user just moved drags the other with it.
       if (from !== null && to !== null && from > to) {
         const moved = from !== filters.scheduledFrom ? from : to;
         setFilter({ scheduledFrom: moved, scheduledTo: moved });

@@ -6,11 +6,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace JobTracker.Common.Presentation.UnitTests;
 
-/// <summary>
-/// The whole error contract, and it is pure — no host, no request, no
-/// database. Every endpoint in the Jobs module inherits these guarantees
-/// without a test of its own for them.
-/// </summary>
 public sealed class ResultExtensionsTests
 {
     private static ProblemDetails ProblemFrom(Result result) =>
@@ -33,9 +28,6 @@ public sealed class ResultExtensionsTests
     [Fact]
     public void An_invariant_refusal_becomes_409_rather_than_400()
     {
-        // Design B6, and the distinction that matters. 400 tells the client to
-        // fix its input; the input was fine and the job had already been
-        // completed.
         ProblemFrom(Result.Failure(Error.Conflict("job.terminal", "Job is closed")))
             .Status.Should().Be(StatusCodes.Status409Conflict);
     }
@@ -50,9 +42,6 @@ public sealed class ResultExtensionsTests
     [Fact]
     public void An_unclassified_failure_becomes_500_rather_than_400()
     {
-        // The mirror image of the rule above. Defaulting the other way reports
-        // a server fault as the caller's mistake, and every such bug gets
-        // closed as a client error.
         ProblemFrom(Result.Failure(new Error("x", "y", ErrorType.Failure)))
             .Status.Should().Be(StatusCodes.Status500InternalServerError);
     }
@@ -62,8 +51,6 @@ public sealed class ResultExtensionsTests
     {
         var problem = ProblemFrom(Result.Failure(Error.NotFound("job.not-found", "No such job")));
 
-        // The frontend switches on kind and quotes the code in a bug report. A
-        // status alone cannot tell two 409s apart.
         problem.Extensions["errorCode"].Should().Be("job.not-found");
         problem.Detail.Should().Be("No such job");
     }
@@ -85,8 +72,6 @@ public sealed class ResultExtensionsTests
     {
         var problem = ProblemFrom(Result.Failure(Error.NotFound("job.not-found", "No such job")));
 
-        // A client that tests for the key's presence should not have to also
-        // test whether it is empty.
         problem.Extensions.Should().NotContainKey("errors");
     }
 
@@ -95,9 +80,6 @@ public sealed class ResultExtensionsTests
     {
         var read = () => Result.Success().ToProblem();
 
-        // Returning something plausible would hide a caller that forgot to
-        // check IsSuccess, and the endpoint would answer 500 to a request that
-        // worked.
         read.Should().Throw<InvalidOperationException>();
     }
 
@@ -117,8 +99,6 @@ public sealed class ResultExtensionsTests
     [Fact]
     public void Match_on_a_valueless_result_still_distinguishes_the_two()
     {
-        // The transition endpoints return 204 and have no value to map, so
-        // they use this overload — and it must not silently succeed.
         Result.Success().Match(Results.NoContent).Should().BeOfType<NoContent>();
         Result.Failure(Error.Conflict("a", "b")).Match(Results.NoContent)
             .Should().BeOfType<ProblemHttpResult>();

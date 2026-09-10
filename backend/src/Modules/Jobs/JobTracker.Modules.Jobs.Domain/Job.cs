@@ -3,19 +3,12 @@ using JobTracker.Modules.Jobs.Domain.Events;
 
 namespace JobTracker.Modules.Jobs.Domain;
 
-/// <summary>
-/// The aggregate root and the only entry point to its data. Every rule in
-/// prd.md section 6 is enforced inside an intention-named method and returns a
-/// <see cref="Result"/> rather than throwing: the model is not anemic because
-/// the rules live with the data they constrain.
-/// </summary>
 public sealed class Job : AggregateRoot, ITenantScoped
 {
     private readonly List<JobPhoto> _photos = [];
 
     private Job(Guid id) : base(id) { }
 
-    // EF only.
     private Job() { }
 
     public string Title { get; private set; } = string.Empty;
@@ -34,14 +27,8 @@ public sealed class Job : AggregateRoot, ITenantScoped
 
     public IReadOnlyCollection<JobPhoto> Photos => _photos.AsReadOnly();
 
-    /// <summary>BR-2. Completed and Cancelled are the audit record.</summary>
     private bool IsTerminal => Status is JobStatus.Completed or JobStatus.Cancelled;
 
-    /// <summary>
-    /// <paramref name="now"/> is a parameter rather than a read of
-    /// <c>DateTimeOffset.UtcNow</c>, so BR-1 is testable without freezing a
-    /// global clock. Handlers supply it from <c>TimeProvider</c>.
-    /// </summary>
     public static Result<Job> Create(
         string title,
         string? description,
@@ -67,8 +54,6 @@ public sealed class Job : AggregateRoot, ITenantScoped
             Title = title,
             Description = description,
             Address = address,
-            // D-14: creation produces a Scheduled job. Draft stays in the model
-            // for a job captured without a date, unreachable from here.
             Status = JobStatus.Scheduled,
             ScheduledDate = scheduledDate,
             AssigneeId = assigneeId,
@@ -81,7 +66,6 @@ public sealed class Job : AggregateRoot, ITenantScoped
         return Result.Success(job);
     }
 
-    /// <summary>FR-2. Enforces BR-1 and BR-2.</summary>
     public Result Reschedule(DateOnly scheduledDate, Guid assigneeId, DateTimeOffset now)
     {
         if (IsTerminal)
@@ -101,7 +85,6 @@ public sealed class Job : AggregateRoot, ITenantScoped
         return Result.Success();
     }
 
-    /// <summary>FR-3. Enforces BR-2 and BR-3.</summary>
     public Result Start(DateTimeOffset startedAt)
     {
         if (IsTerminal)
@@ -120,7 +103,6 @@ public sealed class Job : AggregateRoot, ITenantScoped
         return Result.Success();
     }
 
-    /// <summary>FR-4. Enforces BR-2 and BR-4.</summary>
     public Result Complete(
         DateTimeOffset completedAt,
         string signatureUrl,
@@ -150,8 +132,6 @@ public sealed class Job : AggregateRoot, ITenantScoped
             _photos.Add(new JobPhoto(Guid.NewGuid(), photo.Url, photo.CapturedAt, photo.Caption));
         }
 
-        // StartedAt is non-null here: Complete refuses unless the job is
-        // InProgress, and only Start puts it there.
         Raise(new JobCompletedDomainEvent(Id, CustomerId, StartedAt!.Value, completedAt)
         {
             OrganizationId = OrganizationId,
@@ -160,7 +140,6 @@ public sealed class Job : AggregateRoot, ITenantScoped
         return Result.Success();
     }
 
-    /// <summary>FR-5. Enforces BR-2 and BR-5.</summary>
     public Result Cancel(DateTimeOffset cancelledAt, string reason)
     {
         if (IsTerminal)

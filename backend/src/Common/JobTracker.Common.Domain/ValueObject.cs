@@ -1,11 +1,5 @@
 namespace JobTracker.Common.Domain;
 
-/// <summary>
-/// Structural equality by comparing an ordered projection of components.
-///
-/// A Template Method: <see cref="Equals(object?)"/> and <see cref="GetHashCode"/>
-/// write the algorithm once, and a subclass supplies only what it is made of.
-/// </summary>
 public abstract class ValueObject : IEquatable<ValueObject>
 {
     protected abstract IEnumerable<object?> GetEqualityComponents();

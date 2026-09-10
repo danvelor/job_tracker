@@ -6,14 +6,6 @@ using MediatR;
 
 namespace JobTracker.Modules.Jobs.Application.Notifications;
 
-/// <summary>
-/// FR-10. It consumes the <em>domain</em> event rather than the contract,
-/// because it lives inside Jobs and has no reason to go through a boundary to
-/// reach its own module's data — the contract exists for Billing.
-///
-/// It writes a second row keyed (source_event_id, recipient). The recipient
-/// differs from FR-8's, which is why one unique constraint serves both handlers.
-/// </summary>
 internal sealed class NotifyCustomerOnJobCompletedHandler(
     INotificationRepository notifications,
     IPartyRepository parties,
@@ -42,7 +34,6 @@ internal sealed class NotifyCustomerOnJobCompletedHandler(
         var notification = Notification.Draft(
             domainEvent.Id,
             domainEvent.OrganizationId,
-            // The email, not the name: this one leaves the building.
             customer.Email,
             "Your job has been completed",
             $"{job?.Title ?? "Your job"} was completed on "

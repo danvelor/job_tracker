@@ -17,16 +17,6 @@ export type CancelApi = {
   readonly errorFor: (id: string) => string | undefined;
 };
 
-/**
- * The one place the slices meet for a row, and it lives in the view rather
- * than in a slice — which is what lets four mutually unaware slices produce
- * one row's worth of buttons without any of them importing another
- * (architecture 5.6 rule 2).
- *
- * Which buttons exist is asked of the state machine, not hard-coded: a
- * Completed row offers nothing because the model says so (design A2), and the
- * walkthrough asserts that absence.
- */
 export function JobRowActions({
   job,
   onStart,

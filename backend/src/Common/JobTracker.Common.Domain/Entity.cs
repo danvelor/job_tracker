@@ -4,7 +4,6 @@ public abstract class Entity
 {
     protected Entity(Guid id) => Id = id;
 
-    // EF materialises through this; nothing else should.
     protected Entity() { }
 
     public Guid Id { get; protected init; }

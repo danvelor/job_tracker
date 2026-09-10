@@ -9,17 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace JobTracker.IntegrationTests.Api;
 
-/// <summary>
-/// A fire-and-forget job runs in a scope of its own, minutes after the request
-/// that queued it, with no HttpContext and therefore no claim. Every earlier
-/// test ran the send inline on a context whose tenant was already set, so none
-/// of them could see this — it took the Compose stack, where the notifications
-/// stayed Pending and Hangfire recorded "No organization claim on a validated
-/// principal" against a retry schedule.
-///
-/// These tests resolve the runner the way Hangfire does: from a fresh scope,
-/// with nothing set.
-/// </summary>
 [Collection(PostgresCollection.Name)]
 public sealed class BackgroundJobTenantTests(PostgresFixture postgres) : IAsyncLifetime
 {
@@ -69,9 +58,6 @@ public sealed class BackgroundJobTenantTests(PostgresFixture postgres) : IAsyncL
 
         using (var scope = _api.Services.CreateScope())
         {
-            // No ITenantContextSetter.Use here, and that is the point: this is
-            // the scope Hangfire builds, and nothing in it knows a tenant until
-            // the runner is told one.
             var runner = scope.ServiceProvider.GetRequiredService<MediatorJobRunner>();
             await runner.RunAsync(new SendNotificationCommand(id), Organization);
         }
@@ -88,10 +74,6 @@ public sealed class BackgroundJobTenantTests(PostgresFixture postgres) : IAsyncL
         var runner = scope.ServiceProvider.GetRequiredService<MediatorJobRunner>();
         await runner.RunAsync(new SendNotificationCommand(id), Organization);
 
-        // The scope is shared by whatever runs next on this worker. A tenant
-        // left behind would let the following job read another organization's
-        // data — the failure mode NFR-1 exists to prevent, arriving through the
-        // fix for a different one.
         var read = () => scope.ServiceProvider.GetRequiredService<ITenantContext>().OrganizationId;
 
         read.Should().Throw<InvalidOperationException>();
@@ -103,11 +85,6 @@ public sealed class BackgroundJobTenantTests(PostgresFixture postgres) : IAsyncL
         using var scope = _api.Services.CreateScope();
         var runner = scope.ServiceProvider.GetRequiredService<MediatorJobRunner>();
 
-        // A notification that does not exist. The handler returns a failed
-        // Result, and a runner that discarded it would tell Hangfire the job
-        // succeeded — no retry, no log, and a notification stuck at Pending
-        // with nothing anywhere saying why. That is how the enqueue race below
-        // stayed invisible.
         var run = async () => await runner.RunAsync(
             new SendNotificationCommand(Guid.NewGuid()), Organization);
 

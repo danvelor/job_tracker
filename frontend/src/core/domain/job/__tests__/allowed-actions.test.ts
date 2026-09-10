@@ -21,8 +21,6 @@ describe('allowedActionsFor', () => {
   });
 
   it('agrees with the type-level transition table', () => {
-    // The runtime table and AllowedAction are two statements of one rule, and
-    // nothing but this assertion stops them drifting.
     expectTypeOf<AllowedAction['Scheduled']>().toEqualTypeOf<'START' | 'CANCEL'>();
     expectTypeOf<AllowedAction['InProgress']>().toEqualTypeOf<'COMPLETE' | 'CANCEL'>();
     expectTypeOf<AllowedAction['Completed']>().toBeNever();

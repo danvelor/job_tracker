@@ -16,7 +16,6 @@ public sealed class Address : ValueObject
         Longitude = longitude;
     }
 
-    // EF materialises an owned type through this.
     private Address() { }
 
     public string Street { get; private init; } = string.Empty;

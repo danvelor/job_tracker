@@ -6,12 +6,6 @@ using JobTracker.Modules.Jobs.Infrastructure.Configurations;
 
 namespace JobTracker.IntegrationTests.Api;
 
-/// <summary>
-/// Authentication was designed rather than assumed (architecture 7.1), because
-/// multi-tenancy has nowhere else to obtain the organization from. That makes
-/// it load-bearing, and it is tested as such — including the cases a
-/// happy-path suite omits.
-/// </summary>
 [Collection(PostgresCollection.Name)]
 public sealed class AuthenticationTests(PostgresFixture postgres) : IAsyncLifetime
 {
@@ -47,9 +41,6 @@ public sealed class AuthenticationTests(PostgresFixture postgres) : IAsyncLifeti
     {
         var response = await ClientWith(TestTokens.Forged(Organization)).GetAsync("/api/jobs");
 
-        // The signature is the whole of the protection. Without this the API
-        // would accept any well-formed JWT and the org claim would be a
-        // suggestion anyone could write.
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -58,8 +49,6 @@ public sealed class AuthenticationTests(PostgresFixture postgres) : IAsyncLifeti
     {
         var response = await ClientWith(TestTokens.Expired(Organization)).GetAsync("/api/jobs");
 
-        // With the default five minutes of clock skew this passes for five
-        // minutes after expiry, which is five minutes of a revoked session.
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -79,18 +68,12 @@ public sealed class AuthenticationTests(PostgresFixture postgres) : IAsyncLifeti
         await using var production = new ApiFactory(postgres.ConnectionString, "Production");
         var client = production.CreateClient();
 
-        // Authenticated with a token built directly, because in Production
-        // there is no endpoint to mint one. Without the header the answer
-        // would be 401 for every unmapped path and the test would pass whether
-        // or not the route existed.
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", TestTokens.Signed(Organization, ApiFactory.SigningKey));
 
         var response = await client.PostAsJsonAsync(
             "/auth/dev-token", new { organizationId = Organization });
 
-        // Architecture 7.1. An endpoint that mints a token for any
-        // organization is a tenant isolation bypass with a friendly name.
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -100,9 +83,6 @@ public sealed class AuthenticationTests(PostgresFixture postgres) : IAsyncLifeti
         var missing = await _api.CreateClient().GetAsync("/api/no-such-route");
         var real = await _api.CreateClient().GetAsync("/api/jobs");
 
-        // The fallback policy applies before a 404 can be produced, so both
-        // answer 401. That is the desirable direction: probing for routes
-        // without credentials tells the prober nothing.
         missing.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         real.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -110,8 +90,6 @@ public sealed class AuthenticationTests(PostgresFixture postgres) : IAsyncLifeti
     [Fact]
     public async Task Every_route_requires_authentication_by_default()
     {
-        // A fallback policy rather than an attribute per endpoint: the default
-        // runs the other way, and one forgotten attribute is an open route.
         foreach (var route in new[] { "/api/jobs", "/api/assignees", "/api/customers" })
         {
             var response = await _api.CreateClient().GetAsync(route);

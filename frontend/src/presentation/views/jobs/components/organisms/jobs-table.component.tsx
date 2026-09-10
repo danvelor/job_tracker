@@ -4,12 +4,6 @@ import type { VisibleJob } from '@/presentation/stores/jobs-ui.store';
 
 const HEADINGS = ['', 'TITLE', 'ADDRESS', 'SCHEDULED', 'CREW', 'STATUS'];
 
-/**
- * A thin shell: props in, markup out. It declares no state and no handler
- * body, and the actions each row offers arrive through a render prop rather
- * than through an import, which is what keeps the module graph acyclic
- * (architecture 9.4).
- */
 export function JobsTable({
   jobs,
   hasActiveFilter,

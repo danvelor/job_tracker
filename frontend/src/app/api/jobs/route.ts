@@ -24,14 +24,6 @@ const problem = (title: string, status: number, errorCode: string): Response =>
     { status, headers: { 'content-type': 'application/problem+json' } },
   );
 
-/**
- * The read endpoint SWR fetches (D-29).
- *
- * Reads cannot be Server Actions (assessment line 138) and the browser cannot
- * hold the API token (architecture 7.1), so this handler is the only place a
- * client-side query can go. In plan 3 it is also the only place
- * HttpJobsAdapter's bearer token can live.
- */
 export async function GET(request: Request): Promise<Response> {
   const params = new URL(request.url).searchParams;
 
@@ -41,8 +33,6 @@ export async function GET(request: Request): Promise<Response> {
     return problem('limit must be an integer', 400, 'query.limit');
   }
 
-  // An unknown status filters nothing rather than everything: a typo in a
-  // query string should not silently empty the list.
   const statuses = params.getAll('statuses').filter(isStatus);
   const sort = params.get('sort');
 

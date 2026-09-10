@@ -72,7 +72,6 @@ describe('useJobsUiStore', () => {
 
     const state = useJobsUiStore.getState();
     expect(state.sortConfig).toEqual({ field: 'title', direction: 'asc' });
-    // The ordering key changed, so the old cursor addresses nothing (D-18).
     expect(state.cursor).toBeNull();
   });
 

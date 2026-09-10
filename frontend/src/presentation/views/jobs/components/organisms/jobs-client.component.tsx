@@ -13,14 +13,6 @@ import { JobRowActions } from './job-row-actions.component';
 import { JobsErrorBoundary } from './jobs-error-boundary.component';
 import { JobsTable } from './jobs-table.component';
 
-/**
- * The thin shell of assessment line 117, and the client boundary D-11 names:
- * the page hands it an UNRESOLVED promise and this component unwraps it with
- * use(), which is what makes the <Suspense> above actually suspend.
- *
- * Everything else comes from the orchestrator hook. This component declares no
- * state and no handler body.
- */
 export function JobsClient({
   jobsPromise,
   assignees,

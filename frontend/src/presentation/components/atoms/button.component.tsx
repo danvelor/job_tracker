@@ -20,7 +20,6 @@ export type ButtonProps = {
   readonly type?: 'button' | 'submit';
 };
 
-/** Owns its pending state visually, never logically (design A3). */
 export function Button({
   testId,
   children,

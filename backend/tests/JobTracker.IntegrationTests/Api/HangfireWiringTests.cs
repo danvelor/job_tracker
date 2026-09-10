@@ -8,10 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace JobTracker.IntegrationTests.Api;
 
-/// <summary>
-/// The drain is tested by calling it. This is the one thing calling it cannot
-/// tell you: that anything ever will.
-/// </summary>
 [Collection(PostgresCollection.Name)]
 public sealed class HangfireWiringTests(PostgresFixture postgres) : IAsyncLifetime
 {
@@ -32,8 +28,6 @@ public sealed class HangfireWiringTests(PostgresFixture postgres) : IAsyncLifeti
 
         var recurring = connection.GetRecurringJobs();
 
-        // Without this the whole pipeline is a set of parts that pass their own
-        // tests and never run.
         recurring.Select(job => job.Id).Should().Contain(OutboxDrainJob.RecurringJobId);
     }
 
@@ -48,8 +42,6 @@ public sealed class HangfireWiringTests(PostgresFixture postgres) : IAsyncLifeti
                 $"""select schema_name as "Value" from information_schema.schemata""")
             .ToListAsync();
 
-        // Architecture 4.4: durable across a restart, and separate so job state
-        // is never mistaken for business data or caught by a jobs migration.
         schemas.Should().Contain("hangfire");
     }
 }

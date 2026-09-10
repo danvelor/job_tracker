@@ -89,7 +89,6 @@ describe('useCancelJob', () => {
         'A job in a terminal state cannot change state',
       ),
     );
-    // The field stays open so the reason is not lost with the error.
     expect(result.current.openFor).toBe('job-1');
     expect(result.current.reason).toBe('Weather');
   });

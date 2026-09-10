@@ -40,9 +40,6 @@ describe('QueryBuilder', () => {
       .limit(5)
       .build();
 
-    // Backticks, not quotes: a template literal *type* needs them. In single
-    // quotes this would be a plain string literal containing the characters
-    // "${string}", and the assertion would compare against the wrong type.
     expectTypeOf(result.query).toEqualTypeOf<
       `SELECT ${string} WHERE title like ORDER BY title DESC LIMIT 5`
     >();

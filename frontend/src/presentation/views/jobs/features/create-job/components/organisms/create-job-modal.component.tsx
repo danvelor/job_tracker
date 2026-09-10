@@ -35,10 +35,6 @@ const valueAt = (form: CreateJobFormState, field: CreateJobField): string =>
     ? form.values.address[field.slice(ADDRESS_PREFIX.length) as AddressKey]
     : form.values[field as TopLevelKey];
 
-/**
- * A thin shell: every value and every handler arrives as a prop from the slice
- * hook. It declares no state and no handler body (assessment line 136).
- */
 export function CreateJobModal({
   form,
   assignees,
@@ -123,8 +119,6 @@ export function CreateJobModal({
         )}
 
         <div className="flex gap-2">
-          {/* Submit stays enabled: pressing it reveals every remaining error
-              at once rather than hiding the way forward (design A5 point 3). */}
           <Button testId="create-job-submit" onClick={onSubmit} pending={isPending}>
             Create job
           </Button>

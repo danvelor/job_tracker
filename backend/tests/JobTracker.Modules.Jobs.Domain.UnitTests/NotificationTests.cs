@@ -2,11 +2,6 @@ using FluentAssertions;
 
 namespace JobTracker.Modules.Jobs.Domain.UnitTests;
 
-/// <summary>
-/// A record inside Jobs rather than a module (D-22). It has one lifecycle and
-/// no other invariant, which is exactly why a module would be the anemic kind
-/// D-04 gave Billing a real domain in order to avoid.
-/// </summary>
 public sealed class NotificationTests
 {
     private static readonly DateTimeOffset Now = new(2026, 3, 1, 9, 0, 0, TimeSpan.Zero);
@@ -27,8 +22,6 @@ public sealed class NotificationTests
     [Fact]
     public void A_draft_records_the_event_it_came_from()
     {
-        // The idempotency key (4.5). Without it a replayed message writes a
-        // second row and the customer is told twice.
         ADraft().SourceEventId.Should().Be(SourceEvent);
     }
 
@@ -75,9 +68,6 @@ public sealed class NotificationTests
         var notification = ADraft();
         notification.MarkSent(Now);
 
-        // The same terminal-state rule as BR-2. A retry that re-sent an
-        // already-sent notification would tell the customer twice, which is
-        // the outcome at-least-once delivery makes likely rather than rare.
         notification.MarkSent(Now.AddMinutes(1)).Error.Should().Be(NotificationErrors.NotPending);
         notification.MarkFailed("late", Now.AddMinutes(1))
             .Error.Should().Be(NotificationErrors.NotPending);
@@ -100,8 +90,6 @@ public sealed class NotificationTests
 
         notification.MarkFailed("late", Now.AddMinutes(1));
 
-        // Recording a failure on a notification that was sent would turn the
-        // table into a worse record than no table.
         notification.Status.Should().Be(NotificationStatus.Sent);
         notification.FailureReason.Should().BeNull();
     }

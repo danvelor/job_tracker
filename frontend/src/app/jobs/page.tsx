@@ -30,13 +30,6 @@ async function resolveCustomers(): Promise<readonly Party[]> {
 }
 
 export default async function JobsPage() {
-  // The rosters ARE awaited: they are short lists the filter bar and the
-  // create form need before they can render at all.
-  //
-  // The job page is NOT awaited. The unresolved promise crosses into the
-  // boundary so <Suspense> actually suspends and the skeleton is real (D-11).
-  // Awaiting here would resolve the data before React renders and the fallback
-  // would never appear, which is the trap architecture 5.3 describes.
   const [assignees, customers] = await Promise.all([
     resolveAssignees(),
     resolveCustomers(),

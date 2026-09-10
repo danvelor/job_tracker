@@ -4,11 +4,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace JobTracker.IntegrationTests;
 
-/// <summary>
-/// Case 4 of architecture 8.2, and the requirement most likely to be believed
-/// rather than checked: a mocked repository proves nothing about a filter that
-/// lives below the query.
-/// </summary>
 public sealed class TenantIsolationTests(PostgresFixture postgres) : IntegrationTestBase(postgres)
 {
     private static readonly DateTimeOffset Now = new(2026, 3, 1, 9, 0, 0, TimeSpan.Zero);
@@ -21,8 +16,6 @@ public sealed class TenantIsolationTests(PostgresFixture postgres) : Integration
 
     private async Task SeedBothTenants()
     {
-        // One context with the filter lifted, because seeding has to write rows
-        // this tenant is not allowed to read back.
         await using var seeding = ContextFor(Organization);
         seeding.Jobs.Add(AJob(Organization, Assignee, Customer, "Ours"));
         seeding.Jobs.Add(AJob(OtherOrganization, OtherAssignee, OtherCustomer, "Theirs"));
@@ -34,8 +27,6 @@ public sealed class TenantIsolationTests(PostgresFixture postgres) : Integration
     {
         await SeedBothTenants();
 
-        // Deliberately no Where on OrganizationId. That is the whole of NFR-1:
-        // isolation must not depend on a caller remembering to filter.
         await using var ours = ContextFor(Organization);
         var titles = await ours.Jobs.Select(job => job.Title).ToListAsync();
 
@@ -47,9 +38,6 @@ public sealed class TenantIsolationTests(PostgresFixture postgres) : Integration
     {
         await SeedBothTenants();
 
-        // FR-11 names counts and aggregates separately, because a count that
-        // leaks tells a competitor how much business the other one has without
-        // ever showing them a row.
         await using var ours = ContextFor(Organization);
         var count = await ours.Jobs.CountAsync();
 
@@ -66,8 +54,6 @@ public sealed class TenantIsolationTests(PostgresFixture postgres) : Integration
         await using var ours = ContextFor(Organization);
         var found = await ours.Jobs.SingleOrDefaultAsync(job => job.Id == theirJobId);
 
-        // The dangerous case: an identifier guessed, logged or leaked from
-        // anywhere else must not become a read.
         found.Should().BeNull();
     }
 
@@ -79,17 +65,12 @@ public sealed class TenantIsolationTests(PostgresFixture postgres) : Integration
         await using var ours = ContextFor(Organization);
         var all = await ours.Jobs.IgnoreQueryFilters().CountAsync();
 
-        // Without this, every assertion above would also pass against an empty
-        // table and the suite would prove nothing.
         all.Should().Be(2);
     }
 
     [Fact]
     public async Task The_rosters_are_scoped_too()
     {
-        // The seed put a third assignee and a third customer in the second
-        // organization. A job list is useless without names, so the pickers
-        // that supply them are as much a leak as the jobs themselves.
         await using var ours = ContextFor(Organization);
         var assignees = await ours.Assignees.Select(assignee => assignee.Name).ToListAsync();
         var customers = await ours.Customers.Select(customer => customer.Name).ToListAsync();

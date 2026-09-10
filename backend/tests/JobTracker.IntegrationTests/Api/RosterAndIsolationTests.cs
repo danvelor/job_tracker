@@ -6,11 +6,6 @@ using JobTracker.Modules.Jobs.Infrastructure.Configurations;
 
 namespace JobTracker.IntegrationTests.Api;
 
-/// <summary>
-/// Plan 3B proved the query filter confines a query. This proves the claim
-/// confines the filter — the half of the chain a repository test cannot reach,
-/// because it starts at a token.
-/// </summary>
 [Collection(PostgresCollection.Name)]
 public sealed class RosterAndIsolationTests(PostgresFixture postgres) : IAsyncLifetime
 {
@@ -46,8 +41,6 @@ public sealed class RosterAndIsolationTests(PostgresFixture postgres) : IAsyncLi
     private static async Task<JsonElement> Body(HttpResponseMessage response) =>
         await response.Content.ReadFromJsonAsync<JsonElement>();
 
-    // ---- rosters ---------------------------------------------------------
-
     [Fact]
     public async Task The_assignee_roster_carries_the_names_the_pickers_need()
     {
@@ -80,12 +73,8 @@ public sealed class RosterAndIsolationTests(PostgresFixture postgres) : IAsyncLi
     {
         var response = await _ours.PostAsJsonAsync("/api/assignees", new { name = "Nobody" });
 
-        // D-26: read-only. 405 rather than 404 is the honest answer — the
-        // route exists and the verb does not.
         response.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
     }
-
-    // ---- isolation over the wire -----------------------------------------
 
     [Fact]
     public async Task A_job_created_under_one_token_is_invisible_under_another()
@@ -96,8 +85,6 @@ public sealed class RosterAndIsolationTests(PostgresFixture postgres) : IAsyncLi
 
         var theirRead = await _theirs.GetAsync(location);
 
-        // The whole chain: token to claim to tenant context to query filter to
-        // row. Plan 3B proved the last link; this proves the first three.
         theirRead.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -110,9 +97,6 @@ public sealed class RosterAndIsolationTests(PostgresFixture postgres) : IAsyncLi
 
         var response = await _theirs.PostAsync($"/api/jobs/{id}/start", null);
 
-        // 404, not 409 and not 204. A write is the dangerous direction: a
-        // competitor able to start a job they cannot read is worse than one
-        // able to read it.
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -138,10 +122,6 @@ public sealed class RosterAndIsolationTests(PostgresFixture postgres) : IAsyncLi
     [Fact]
     public async Task A_job_cannot_be_created_against_another_tenants_roster()
     {
-        // The forgery the claim cannot stop on its own: our token, their
-        // assignee. The tenant filter hides the row from the foreign-key
-        // check, so this must fail rather than create a job assigned to
-        // someone in another company.
         var response = await _ours.PostAsJsonAsync(
             "/api/jobs", AJob(RosterSeed.AssigneeOther, RosterSeed.CustomerOther));
 

@@ -14,14 +14,6 @@ export type JobFilters = {
 
 export type SortConfig = { field: JobSortField; direction: 'asc' | 'desc' };
 
-/**
- * Note what is absent: there is no `jobs` array. Rows belong to SWR (D-05),
- * which is what point 5 of assessment section 2.2 requires and what the rubric
- * scores on line 409.
- *
- * `DeepReadonly` on the state means a selector's consumer cannot mutate what
- * it was handed.
- */
 export type JobsUiState = DeepReadonly<{
   filters: JobFilters;
   cursor: string | null;
@@ -67,10 +59,6 @@ const without = (
 ): Record<string, JobStatus> =>
   Object.fromEntries(Object.entries(source).filter(([key]) => key !== id));
 
-/**
- * Created without immer: `DeepReadonly` state and a mutating draft are
- * contradictory, so every action returns a new object.
- */
 export const useJobsUiStore = create<JobsUiState & JobsUiActions>()((set) => ({
   ...initialState,
 
@@ -81,8 +69,6 @@ export const useJobsUiStore = create<JobsUiState & JobsUiActions>()((set) => ({
 
   setCursor: (cursor) => set({ cursor }),
 
-  // The ordering key changed, so the old cursor addresses a position that no
-  // longer exists (D-18).
   setSort: (field, direction) => set({ sortConfig: { field, direction }, cursor: null }),
 
   toggleSelection: (id) =>
@@ -106,8 +92,6 @@ export const useJobsUiStore = create<JobsUiState & JobsUiActions>()((set) => ({
       rollbackSnapshot: without(state.rollbackSnapshot, id),
     })),
 
-  // Dropping the overlay entry *is* the restore: the row falls back to the
-  // status SWR holds, which is the one the snapshot recorded.
   rollbackOptimistic: (id) =>
     set((state) => ({
       optimisticStatus: without(state.optimisticStatus, id),
@@ -142,19 +126,6 @@ export const selectOptimisticStatus =
   (state: JobsUiState): JobStatus | undefined =>
     state.optimisticStatus[id];
 
-/**
- * `filteredJobs` in the sense assessment line 146 requires: derived by a
- * selector, with no `useEffect` and no second copy. It takes SWR's rows,
- * overlays the optimistic status and marks selection.
- *
- * It does **not** sort. Ordering is server-side, because the keyset cursor
- * must order by the same key the query does; re-sorting the loaded page would
- * order one page differently from the next (D-18).
- *
- * Memoised on the identity of the overlay and the selection, so the reference
- * is stable across unrelated store updates. Without that the orchestrator's
- * `useMemo` is defeated and every row re-renders on any change.
- */
 export const makeVisibleJobsSelector = (rows: readonly JobSummary[]) => {
   let lastOverlay: JobsUiState['optimisticStatus'] | null = null;
   let lastSelection: JobsUiState['selectedJobIds'] | null = null;

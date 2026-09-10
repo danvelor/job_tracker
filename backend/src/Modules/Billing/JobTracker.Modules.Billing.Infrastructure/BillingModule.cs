@@ -9,11 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace JobTracker.Modules.Billing.Infrastructure;
 
-/// <summary>
-/// The second module, and the proof that the first's registration was a shape
-/// rather than a one-off: one method, one schema, one migration history, and
-/// nothing shared by accident.
-/// </summary>
 public static class BillingModule
 {
     public static IServiceCollection AddBillingModule(
@@ -28,11 +23,6 @@ public static class BillingModule
 
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
 
-        // Its own unit of work over its own context. Sharing Jobs' would make
-        // one SaveChanges write both schemas, which is the coupling the
-        // boundary exists to prevent — and a keyed registration of the shared
-        // interface let the handler resolve Jobs' by asking for the unkeyed
-        // one, which compiled and wrote nothing.
         services.AddScoped<IBillingUnitOfWork, BillingUnitOfWork>();
 
         services.AddScoped<

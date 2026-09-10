@@ -7,11 +7,6 @@ namespace JobTracker.Modules.Jobs.Presentation.Jobs;
 
 internal sealed class CreateJob : IEndpoint
 {
-    /// <summary>
-    /// No organization identifier. It comes from the validated claim
-    /// (design B6); a request that carried one would be a request that could
-    /// lie about one.
-    /// </summary>
     internal sealed record Request(
         string Title,
         string? Description,
@@ -41,8 +36,6 @@ internal sealed class CreateJob : IEndpoint
                         tenant.OrganizationId),
                     cancellationToken);
 
-                // 201 with a Location the client can follow, not 200 with a
-                // bare identifier.
                 return result.Match(id => Results.Created($"/api/jobs/{id}", new { id }));
             })
             .WithTags("Jobs");

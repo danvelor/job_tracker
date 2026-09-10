@@ -6,12 +6,6 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace JobTracker.Api.Authentication;
 
-/// <summary>
-/// HS256 with a symmetric key, because the API is both issuer and validator
-/// (architecture 7.1). A real deployment replaces this one class with an
-/// identity provider and nothing else in the design moves — which is the point
-/// of keeping token acquisition behind a single seam.
-/// </summary>
 internal sealed class TokenIssuer(IOptions<JwtOptions> options)
 {
     public const string OrganizationClaim = "org";

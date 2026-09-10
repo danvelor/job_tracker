@@ -6,17 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace JobTracker.ArchitectureTests;
 
-/// <summary>
-/// Layer 4 of architecture 7.2. Layers 1-3 stop a mistake from being exploited;
-/// this one stops the mistake from being made — adding a tenant-scoped table
-/// and forgetting its filter fails the build rather than leaking in production.
-/// </summary>
 public sealed class TenantRules
 {
-    /// <summary>
-    /// Building the model needs no database, only a provider that knows how to
-    /// translate. Nothing here opens a connection.
-    /// </summary>
     private static JobsDbContext ModelOnlyContext() =>
         new(
             new DbContextOptionsBuilder<JobsDbContext>()
@@ -50,10 +41,6 @@ public sealed class TenantRules
     {
         using var context = ModelOnlyContext();
 
-        // The rule above only sees entities that remembered to implement the
-        // interface. This one catches the earlier mistake: a table with an
-        // organization column that never declared itself, and so was never
-        // asked for a filter.
         var undeclared = context.Model.GetEntityTypes()
             .Where(entity => entity.FindProperty("OrganizationId") is not null)
             .Where(entity => !typeof(ITenantScoped).IsAssignableFrom(entity.ClrType))

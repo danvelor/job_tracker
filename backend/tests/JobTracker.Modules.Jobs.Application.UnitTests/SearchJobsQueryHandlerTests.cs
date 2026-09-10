@@ -34,9 +34,6 @@ public sealed class SearchJobsQueryHandlerTests
 
         await Handler().Handle(AQuery(2), CancellationToken.None);
 
-        // The extra row is how the handler learns another page exists without
-        // a count, which is the cost NFR-5 rejects. The repository runs the
-        // query; the handler builds the envelope (D-25).
         captured!.Limit.Should().Be(3);
     }
 
@@ -78,8 +75,6 @@ public sealed class SearchJobsQueryHandlerTests
     [Fact]
     public async Task An_exactly_full_page_with_nothing_beyond_reports_no_cursor()
     {
-        // The boundary the extra row exists to detect: two rows requested, two
-        // returned means the page is full and the data is exhausted.
         Returns(ARow(Guid.NewGuid()), ARow(Guid.NewGuid()));
 
         var result = await Handler().Handle(AQuery(2), CancellationToken.None);
@@ -130,8 +125,6 @@ public sealed class SearchJobsQueryHandlerTests
 
         var result = await Handler().Handle(AQuery(), CancellationToken.None);
 
-        // An ordinal on the wire is what makes an enum dangerous across
-        // deployments, and the schema stores text for the same reason.
         result.Value.Items.Single().Status.Should().Be("Scheduled");
     }
 }

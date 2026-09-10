@@ -3,22 +3,6 @@ import type { VisibleJob } from '@/presentation/stores/jobs-ui.store';
 import { Checkbox } from '../atoms/checkbox.component';
 import { StatusBadge } from '../atoms/status-badge.component';
 
-/**
- * A shared molecule, so it sits below the slices. The actions it renders
- * belong to slices *above* it, and importing one would close the loop
- * components/ -> views/jobs/features/ -> components/. They arrive as a node
- * instead (design A3, architecture 9.4).
- *
- * The accessible name is built from what a JobSummary holds. It used to
- * reconstruct a JobState so it could call getJobSummary, which meant inventing
- * a startedAt and a signatureUrl the summary does not carry — a label that was
- * right for Scheduled by accident. getJobSummary lives on /jobs/[id] now,
- * where the timestamps are real.
- */
-/**
- * An em dash rather than an empty cell: a blank reads as a rendering fault,
- * and the accessible name would end in a bare comma.
- */
 const scheduledDate = (job: VisibleJob): string => job.scheduledDate ?? '—';
 
 export function JobRow({

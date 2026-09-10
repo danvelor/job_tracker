@@ -15,8 +15,6 @@ describe('SignaturePad', () => {
   it('exposes the field to assistive technology by name', () => {
     render(<SignaturePad testId="probe" value="" onChange={jest.fn()} />);
 
-    // The text field is the accessible path for anyone who cannot sign with a
-    // pointer, so it carries a name rather than relying on the canvas.
     expect(screen.getByLabelText('Customer signature')).toBeInTheDocument();
   });
 

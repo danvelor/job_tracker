@@ -6,16 +6,6 @@ using Microsoft.Extensions.Options;
 
 namespace JobTracker.Modules.Jobs.Infrastructure.Outbox;
 
-/// <summary>
-/// Architecture 4.4, role one. Every poll it takes a batch of unprocessed rows,
-/// republishes each through MediatR, and stamps the ones that succeeded.
-///
-/// The batch is selected FOR UPDATE SKIP LOCKED inside an explicit transaction,
-/// so several workers can poll at once and each row is handled by one of them.
-/// Without it two workers read the same batch and every consequence happens
-/// twice — which the consumers' unique constraints absorb, but at the cost of
-/// doing all the work twice on every poll.
-/// </summary>
 public sealed class OutboxProcessor(
     JobsDbContext context,
     IPublisher publisher,
@@ -47,25 +37,15 @@ public sealed class OutboxProcessor(
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        // After the commit, never before. Work queued by a handler reads rows
-        // this transaction wrote, and until it commits no other connection can
-        // see them.
         queue.Flush();
     }
 
     private async Task PublishOne(OutboxMessage message, CancellationToken cancellationToken)
     {
-        // Caught per message, not per batch. A drain that stopped at the first
-        // failure would stop every unrelated job in the system from billing or
-        // notifying — this is the one place a broad catch is the right shape.
         try
         {
             var domainEvent = OutboxSerializer.Deserialize(message.Type, message.Content);
 
-            // A background job has no request and therefore no claim, so the
-            // tenant comes from the event. Without this every tenant-scoped
-            // query a handler makes has nothing to filter by — which is not a
-            // subtle failure, it is every handler throwing on its first read.
             using (tenant.Use(domainEvent.OrganizationId))
             {
                 await publisher.Publish(domainEvent, cancellationToken);
@@ -75,8 +55,6 @@ public sealed class OutboxProcessor(
         }
         catch (Exception exception)
         {
-            // Deliberately left unprocessed: the next drain tries again, and
-            // the error is a note for whoever reads the table.
             message.RecordFailure(exception.ToString());
         }
     }

@@ -19,7 +19,6 @@ public sealed class CreateJobCommandHandlerTests
     private CreateJobCommandHandler Handler() =>
         new(_repository.Object, _parties.Object, _unitOfWork.Object, _time);
 
-    /// <summary>Both rosters answer yes unless a test says otherwise.</summary>
     private void Parties(bool assigneeExists = true, bool customerExists = true)
     {
         _parties
@@ -63,9 +62,6 @@ public sealed class CreateJobCommandHandlerTests
 
         await Handler().Handle(AValidCommand(), CancellationToken.None);
 
-        // The event must be on the aggregate when it reaches the repository:
-        // the outbox interceptor reads it during SaveChanges, so an event
-        // raised after this point would never make it into the transaction.
         captured!.DomainEvents.Should().ContainSingle()
             .Which.Should().BeOfType<JobCreatedDomainEvent>();
     }
@@ -96,8 +92,6 @@ public sealed class CreateJobCommandHandlerTests
     [Fact]
     public async Task It_reads_the_clock_from_TimeProvider_rather_than_from_the_system()
     {
-        // The handler supplies `now`; the aggregate never reads it. A date that
-        // is "today" only under the injected clock proves which one was used.
         var command = AValidCommand() with { ScheduledDate = new DateOnly(2026, 3, 1) };
 
         var result = await Handler().Handle(command, CancellationToken.None);
@@ -108,9 +102,6 @@ public sealed class CreateJobCommandHandlerTests
     [Fact]
     public async Task A_failing_command_returns_a_failure_rather_than_throwing()
     {
-        // Result<Guid> is built through the same path the pipeline behaviour
-        // uses, and a malformed failure would surface as a cast exception
-        // rather than as a Result.
         var command = AValidCommand() with { Title = "  " };
 
         var act = async () => await Handler().Handle(command, CancellationToken.None);
@@ -123,17 +114,9 @@ public sealed class CreateJobCommandHandlerTests
         public override DateTimeOffset GetUtcNow() => now;
     }
 
-    // ---- the roster belongs to the tenant ---------------------------------
-
     [Fact]
     public async Task A_job_cannot_be_assigned_to_a_crew_member_of_another_organization()
     {
-        // The gap the query filter cannot close on its own. The foreign key
-        // lives in the database and sees every row; the filter hides the
-        // roster from this tenant's reads but not from the constraint check.
-        // Without this the API creates a job in our organization pointing at
-        // their crew — a corrupt row, and a probe that reveals which
-        // identifiers exist elsewhere.
         Parties(assigneeExists: false, customerExists: true);
 
         var result = await Handler().Handle(AValidCommand(), CancellationToken.None);
@@ -156,9 +139,6 @@ public sealed class CreateJobCommandHandlerTests
     [Fact]
     public async Task The_roster_is_checked_before_the_aggregate_is_built()
     {
-        // Order matters for the message the user sees. A command with both a
-        // past date and a foreign assignee should name the date, because that
-        // is the field the user can see and fix in the form.
         Parties(assigneeExists: true, customerExists: true);
 
         var result = await Handler().Handle(

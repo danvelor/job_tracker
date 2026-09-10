@@ -9,28 +9,12 @@ public enum NotificationStatus
     Failed,
 }
 
-/// <summary>
-/// A record inside Jobs rather than a module of its own (D-22). Notifying has
-/// one lifecycle and no other invariant, so a module would be the anemic kind
-/// D-04 gave Billing a real domain in order to avoid.
-///
-/// Delivery is simulated; the record is not. A reviewer verifies FR-8 and FR-10
-/// with <c>select status, recipient from jobs.notifications</c>, which is
-/// stronger evidence than a log line and is what makes NFR-3 checkable in the
-/// data.
-/// </summary>
 public sealed class Notification : Entity, ITenantScoped
 {
     private Notification(Guid id) : base(id) { }
 
-    // EF only.
     private Notification() { }
 
-    /// <summary>
-    /// The identity of the domain event that caused this (D-34). Half of the
-    /// idempotency key, and stable across a replay — which is the condition
-    /// architecture 4.5 puts on one.
-    /// </summary>
     public Guid SourceEventId { get; private init; }
 
     public Guid OrganizationId { get; private init; }
@@ -73,11 +57,6 @@ public sealed class Notification : Entity, ITenantScoped
         });
     }
 
-    /// <summary>
-    /// The same terminal-state rule as BR-2. A retry that re-sent an
-    /// already-sent notification would tell the customer twice — and
-    /// at-least-once delivery makes that likely rather than rare.
-    /// </summary>
     public Result MarkSent(DateTimeOffset sentAt)
     {
         if (Status != NotificationStatus.Pending)

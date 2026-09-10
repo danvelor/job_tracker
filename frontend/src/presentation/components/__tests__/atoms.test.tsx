@@ -21,8 +21,6 @@ describe('controlled atoms', () => {
 
     await userEvent.type(input, 'more');
 
-    // The owner ignored the change, so the value did not move. A component
-    // that kept its own state would show "fixedmore".
     expect(input).toHaveValue('fixed');
   });
 

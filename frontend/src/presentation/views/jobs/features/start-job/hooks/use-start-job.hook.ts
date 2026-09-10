@@ -7,11 +7,6 @@ import { useJobsUiStore } from '@/presentation/stores/jobs-ui.store';
 import { jobsEventBus } from '@/shared/events/jobs-event-bus';
 import { startJobAction } from '../actions/start-job.action';
 
-/**
- * The optimistic path, in its smallest complete form: write the intended
- * status into the overlay, run the Server Action, then commit and ask the view
- * to revalidate, or roll back and put the message on the row.
- */
 export function useStartJob() {
   const { beginOptimistic, commitOptimistic, rollbackOptimistic } = useJobsUiStore(
     useShallow((state) => ({
@@ -21,8 +16,6 @@ export function useStartJob() {
     })),
   );
 
-  // Keyed by job id so two rows fail independently, which is what design A5
-  // means by the error appearing on its own row.
   const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
   const [isPending, startTransition] = useTransition();
 
@@ -38,8 +31,6 @@ export function useStartJob() {
     (id: string, current: JobStatus) => {
       forget(id);
 
-      // Written before the await: that ordering is what makes the change
-      // optimistic rather than merely fast.
       beginOptimistic(id, 'InProgress', current);
 
       startTransition(async () => {
@@ -47,8 +38,6 @@ export function useStartJob() {
 
         if (outcome.ok) {
           commitOptimistic(id);
-          // The view revalidates. The slice does not know the view exists,
-          // which is rule 2 of architecture 5.6 holding in practice.
           jobsEventBus.emit('jobs:invalidate', undefined);
           return;
         }

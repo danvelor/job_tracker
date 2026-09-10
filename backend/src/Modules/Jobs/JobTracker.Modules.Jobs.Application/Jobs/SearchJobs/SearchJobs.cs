@@ -34,9 +34,6 @@ internal sealed class SearchJobsQueryHandler(IJobRepository jobs)
     public async Task<Result<PagedList<JobResponse>>> Handle(
         SearchJobsQuery query, CancellationToken cancellationToken)
     {
-        // One row more than the page. That extra row is how the handler learns
-        // another page exists without asking for a count, which is the cost
-        // NFR-5 rejects.
         var criteria = new JobSearchCriteria(
             query.OrganizationId, query.Text, query.Statuses, query.From, query.To,
             query.AssigneeId, query.Sort, query.Cursor, query.Limit + 1);
@@ -46,7 +43,6 @@ internal sealed class SearchJobsQueryHandler(IJobRepository jobs)
         var hasMore = rows.Count > query.Limit;
         var page = hasMore ? rows.Take(query.Limit).ToList() : rows;
 
-        // The repository runs the query; the handler builds the envelope (D-25).
         return Result.Success(new PagedList<JobResponse>(
             page.Select(Map).ToList(),
             hasMore && page.Count > 0 ? page[^1].Id.ToString() : null));
@@ -55,9 +51,6 @@ internal sealed class SearchJobsQueryHandler(IJobRepository jobs)
     private static JobResponse Map(JobSearchResult row) => new(
         row.Id,
         row.Title,
-        // Text, not an ordinal: an ordinal on the wire is what makes an enum
-        // dangerous across deployments, and the schema stores text for the
-        // same reason (architecture 6.2).
         row.Status.ToString(),
         row.ScheduledDate,
         row.AssigneeId,

@@ -28,8 +28,6 @@ describe('validate', () => {
   it('requires every address field', () => {
     const errors = validate({ ...valid, address: { ...valid.address, city: '' } });
 
-    // PathKeys types the key, so 'address.city' compiles and 'address.town'
-    // does not — the whole reason the error map is keyed this way (D-06).
     expect(errors['address.city']).toBe('City is required');
   });
 
@@ -59,8 +57,6 @@ describe('validate', () => {
   });
 
   it('reports every problem at once rather than the first', () => {
-    // Design A5 point 3: pressing submit reveals all remaining errors rather
-    // than hiding the way forward one field at a time.
     expect(Object.keys(validate(EMPTY_VALUES)).length).toBeGreaterThan(3);
   });
 

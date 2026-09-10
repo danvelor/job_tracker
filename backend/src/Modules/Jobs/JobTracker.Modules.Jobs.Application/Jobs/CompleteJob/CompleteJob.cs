@@ -30,8 +30,6 @@ internal sealed class CompleteJobCommandHandler(
 
         var now = time.GetUtcNow();
 
-        // The capture time comes from the clock rather than from the request:
-        // a client-supplied timestamp is evidence the client controls.
         var photos = command.Photos
             .Select(photo => new NewJobPhoto(photo.Url, now, photo.Caption))
             .ToList();
@@ -48,10 +46,6 @@ internal sealed class CompleteJobCommandHandler(
     }
 }
 
-/// <summary>
-/// Shape only. BR-4 lives in the aggregate; this rejects a request that could
-/// not possibly satisfy it before a database round trip.
-/// </summary>
 internal sealed class CompleteJobCommandValidator : AbstractValidator<CompleteJobCommand>
 {
     public CompleteJobCommandValidator()

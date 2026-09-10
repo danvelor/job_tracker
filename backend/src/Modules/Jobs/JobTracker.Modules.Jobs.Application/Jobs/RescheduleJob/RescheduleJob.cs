@@ -30,9 +30,6 @@ internal sealed class RescheduleJobCommandHandler(
             return rescheduled;
         }
 
-        // Reassignment is the other door into the same hole: correcting a job
-        // onto another organization's crew is the same forgery as creating one
-        // there.
         if (!await parties.AssigneeExistsAsync(
                 command.AssigneeId, command.OrganizationId, cancellationToken))
         {

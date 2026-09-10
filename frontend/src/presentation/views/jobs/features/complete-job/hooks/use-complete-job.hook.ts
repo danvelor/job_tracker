@@ -54,7 +54,6 @@ export function useCompleteJob() {
       const id = openFor;
       if (id === null) return;
 
-      // BR-4 before any call is made (design A5, complete flow point 3).
       if (signature.trim() === '') {
         setError(SIGNATURE_REQUIRED);
         return;

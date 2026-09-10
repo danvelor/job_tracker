@@ -27,8 +27,6 @@ public sealed class AggregateRootTests
     [Fact]
     public void The_event_collection_is_exposed_read_only()
     {
-        // A caller that could add to this collection could fabricate a
-        // consequence the aggregate never decided on.
         typeof(AggregateRoot)
             .GetProperty(nameof(AggregateRoot.DomainEvents))!
             .PropertyType.Should().Be(typeof(IReadOnlyCollection<IDomainEvent>));

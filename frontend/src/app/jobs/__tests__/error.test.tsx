@@ -4,18 +4,8 @@ import JobsError from '../error';
 
 const refresh = jest.fn();
 
-// jsdom mounts no App Router, so useRouter() has no provider to read. The mock
-// is also the assertion target: `refresh` is half of what the retry does.
 jest.mock('next/navigation', () => ({ useRouter: () => ({ refresh: refresh }) }));
 
-/**
- * The route-level error boundary of assessment line 108. Its retry is the part
- * the rubric names, and a `reset` that is wired to nothing looks identical to
- * one that works until someone clicks it.
- *
- * `src/app/**` is excluded from the coverage gate (jest.config.ts), so these
- * assertions are the only thing standing between this file and silent rot.
- */
 describe('JobsError', () => {
   const error = new Error('The upstream service is unavailable');
 
@@ -49,8 +39,6 @@ describe('JobsError', () => {
 
     await userEvent.click(screen.getByTestId('jobs-error-retry'));
 
-    // Without this, reset() re-renders the failure it already has and the
-    // button recovers nothing — which is what the Playwright run measured.
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 

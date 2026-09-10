@@ -83,14 +83,6 @@ describe('transitionJob', () => {
     expect(next.status).toBe('Cancelled');
   });
 
-  // The assertion in each of the four cases below is that the call does not
-  // compile, so the call must never run: @ts-expect-error suppresses the type
-  // error but leaves the statement executing, and an invalid pair reaching the
-  // implementation trips the defect guard in `narrow`. Holding each one in a
-  // closure that is never invoked keeps the compile-time claim and nothing
-  // else. tsc reports an unused directive if any of them starts compiling,
-  // which is what makes these assertions rather than comments.
-
   it('refuses at compile time to start a Draft', () => {
     const invalid = () => {
       // @ts-expect-error Draft only allows SCHEDULE
@@ -102,8 +94,7 @@ describe('transitionJob', () => {
 
   it('refuses at compile time to complete a Scheduled job', () => {
     const invalid = () => {
-      // @ts-expect-error BR-3: only a Scheduled job can start, and only an
-      // InProgress job can complete
+      // @ts-expect-error only an InProgress job can complete
       transitionJob(scheduled, { type: 'COMPLETE', completedAt, signatureUrl: 's' });
     };
 
@@ -148,12 +139,6 @@ describe('transitionJob', () => {
   });
 
   it('guards against a state and action pair the types would have refused', () => {
-    // No cast is needed to reach the defect guard, and that is the point D-10
-    // makes: at the unnarrowed union `ActionFor<JobState>` is the whole of
-    // `JobAction`, so this widened signature accepts every pair — including
-    // Draft with START. It is precisely why the exported signature is generic
-    // over the *narrowed* state, and why line 81's signature could never
-    // satisfy line 87.
     const unnarrowed: (state: JobState, action: JobAction) => JobState =
       transitionJob;
 

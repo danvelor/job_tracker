@@ -5,12 +5,6 @@ using Npgsql;
 
 namespace JobTracker.IntegrationTests;
 
-/// <summary>
-/// Case 9 of architecture 8.2. The aggregate enforces every one of these too,
-/// and that is not enough: a row written by anything other than the aggregate —
-/// a migration, a psql session, a future service, a bulk import — must not be
-/// able to contradict a business rule the rest of the system relies on.
-/// </summary>
 public sealed class ConstraintTests(PostgresFixture postgres) : IntegrationTestBase(postgres)
 {
     private static readonly DateTimeOffset Now = new(2026, 3, 1, 9, 0, 0, TimeSpan.Zero);
@@ -43,7 +37,6 @@ public sealed class ConstraintTests(PostgresFixture postgres) : IntegrationTestB
     [Fact]
     public async Task A_completed_job_cannot_exist_without_a_signature()
     {
-        // BR-4 at the level of the data.
         var write = async () => await InsertRawJob("Completed");
 
         (await write.Should().ThrowAsync<PostgresException>())
@@ -53,8 +46,6 @@ public sealed class ConstraintTests(PostgresFixture postgres) : IntegrationTestB
     [Fact]
     public async Task A_completed_job_with_a_signature_is_accepted()
     {
-        // The constraint has to permit the legitimate row, or the test above
-        // would pass against a table that refuses everything.
         var write = async () => await InsertRawJob("Completed", signature: "data:image/png;base64,AAA");
 
         await write.Should().NotThrowAsync();
@@ -63,7 +54,6 @@ public sealed class ConstraintTests(PostgresFixture postgres) : IntegrationTestB
     [Fact]
     public async Task A_cancelled_job_cannot_exist_without_a_reason()
     {
-        // BR-5.
         var write = async () => await InsertRawJob("Cancelled");
 
         (await write.Should().ThrowAsync<PostgresException>())
@@ -75,9 +65,6 @@ public sealed class ConstraintTests(PostgresFixture postgres) : IntegrationTestB
     {
         await SeedOneJob();
 
-        // Storing the status as text buys readability; without a CHECK it also
-        // buys the freedom to store nonsense, which an integer enum at least
-        // did not allow.
         var write = async () => await Context.Database.ExecuteSqlAsync(
             $"update jobs.jobs set status = 'Elsewhere'");
 
@@ -99,9 +86,6 @@ public sealed class ConstraintTests(PostgresFixture postgres) : IntegrationTestB
                      cancellation_reason = 'reason'
                  """);
 
-            // Enumerating the enum rather than listing five literals: adding a
-            // JobStatus without extending the constraint fails here, which is
-            // the only place that pairing is checked.
             await write.Should().NotThrowAsync($"{status} is a status the domain defines");
         }
     }
@@ -122,8 +106,6 @@ public sealed class ConstraintTests(PostgresFixture postgres) : IntegrationTestB
                 {stranger}, {Customer}, now(), now())
              """);
 
-        // D-26 reversed D-21 precisely so this fails. A job assigned to nobody
-        // real is a job nobody does.
         await write.Should().ThrowAsync<PostgresException>();
     }
 
@@ -141,9 +123,6 @@ public sealed class ConstraintTests(PostgresFixture postgres) : IntegrationTestB
 
         await Context.Database.ExecuteSqlAsync($"delete from jobs.jobs where id = {job.Id}");
 
-        // BR-2 means the application never deletes a job. The cascade is for
-        // the day a database is trimmed by hand: a photo whose job is gone is
-        // a row nothing can ever reach.
         var orphans = await Context.Database
             .SqlQuery<int>($"""select count(*)::int as "Value" from jobs.job_photos""")
             .SingleAsync();
@@ -157,9 +136,6 @@ public sealed class ConstraintTests(PostgresFixture postgres) : IntegrationTestB
         var assignees = await Context.Assignees.CountAsync();
         var customers = await Context.Customers.CountAsync();
 
-        // Every walkthrough step that picks a crew or a customer depends on
-        // these existing. A missing seed would fail the smoke run at step 2,
-        // several layers away from the cause.
         assignees.Should().Be(2);
         customers.Should().Be(2);
     }

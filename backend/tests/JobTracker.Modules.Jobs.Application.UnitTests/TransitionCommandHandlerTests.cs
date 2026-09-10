@@ -10,12 +10,6 @@ using Moq;
 
 namespace JobTracker.Modules.Jobs.Application.UnitTests;
 
-/// <summary>
-/// The four transition handlers share one shape — load, refuse if absent, call
-/// the aggregate, return its Result, save on success — so they share one set of
-/// tests. What each must prove separately is that it calls the *right*
-/// aggregate method and that it does not save when the aggregate refused.
-/// </summary>
 public sealed class TransitionCommandHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 3, 1, 9, 0, 0, TimeSpan.Zero);
@@ -40,7 +34,6 @@ public sealed class TransitionCommandHandlerTests
         return job;
     }
 
-    /// <summary>The roster answers yes unless a test says otherwise.</summary>
     public TransitionCommandHandlerTests() =>
         _parties
             .Setup(p => p.AssigneeExistsAsync(
@@ -57,8 +50,6 @@ public sealed class TransitionCommandHandlerTests
 
     private void NeverSaved() =>
         _unitOfWork.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
-
-    // ---- start -----------------------------------------------------------
 
     [Fact]
     public async Task StartJob_starts_a_Scheduled_job_and_saves()
@@ -94,13 +85,9 @@ public sealed class TransitionCommandHandlerTests
 
         var result = await handler.Handle(new StartJobCommand(JobId, Organization), default);
 
-        // A refused transition changed nothing, so saving would write an
-        // unchanged aggregate and, worse, drain an outbox that has no event.
         result.Error.Should().Be(JobErrors.NotScheduled);
         NeverSaved();
     }
-
-    // ---- complete --------------------------------------------------------
 
     [Fact]
     public async Task CompleteJob_completes_an_InProgress_job_with_its_photos()
@@ -148,8 +135,6 @@ public sealed class TransitionCommandHandlerTests
         NeverSaved();
     }
 
-    // ---- cancel ----------------------------------------------------------
-
     [Fact]
     public async Task CancelJob_cancels_with_its_reason_and_saves()
     {
@@ -179,8 +164,6 @@ public sealed class TransitionCommandHandlerTests
         result.Error.Should().Be(JobErrors.Terminal);
         NeverSaved();
     }
-
-    // ---- reschedule ------------------------------------------------------
 
     [Fact]
     public async Task RescheduleJob_moves_the_date_and_saves()
@@ -212,7 +195,6 @@ public sealed class TransitionCommandHandlerTests
         NeverSaved();
     }
 
-
     [Fact]
     public async Task RescheduleJob_refuses_a_crew_member_from_another_organization()
     {
@@ -228,9 +210,6 @@ public sealed class TransitionCommandHandlerTests
             new RescheduleJobCommand(JobId, Organization, new DateOnly(2026, 4, 1), Guid.NewGuid()),
             default);
 
-        // Reassignment is the other door into the same hole as creation: the
-        // foreign key sees every roster row, and only the tenant-filtered
-        // lookup knows which ones are ours.
         result.Error.Should().Be(JobErrors.AssigneeNotOnTheRoster);
         NeverSaved();
     }
