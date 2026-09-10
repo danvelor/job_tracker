@@ -7,7 +7,7 @@ export default function JobNotFound() {
       <p className="mb-4 text-sm text-slate-600">
         That job does not exist, or it belongs to another organization.
       </p>
-      <Link href="/jobs" className="text-sm underline">
+      <Link href="/jobs" data-testid="jobs-not-found-back" className="text-sm underline">
         Back to the job list
       </Link>
     </section>

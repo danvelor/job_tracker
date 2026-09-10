@@ -248,7 +248,9 @@ identifiers carry the job identifier.
 | `jobs-empty-no-jobs` | Empty, no filter |
 | `jobs-empty-no-matches` | Empty, filter active |
 | `jobs-error` | Error state root |
-| `jobs-error-retry` | Retry |
+| `jobs-error-retry` | Retry. The route boundary only: `JobsErrorBoundary` renders `jobs-error` without one, so this is what tells the two apart |
+| `jobs-not-found` | `not-found.tsx`, reached through `notFound()` in `[id]/page.tsx` |
+| `jobs-not-found-back` | The way back to the list from the 404 |
 | `jobs-load-more` | Load more |
 | `job-row-{id}` | One row |
 | `job-row-{id}-title` | Title cell |
