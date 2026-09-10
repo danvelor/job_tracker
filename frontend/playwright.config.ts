@@ -7,6 +7,25 @@ import { defineConfig, devices } from '@playwright/test';
  */
 const smoke = process.env.SMOKE_BASE_URL;
 
+/**
+ * A port nothing listens on. The offline server points the frontend's API url
+ * at it, so `HttpJobsAdapter` cannot connect, `app/jobs/page.tsx` throws, and
+ * `app/jobs/error.tsx` takes over. That is the only faithful way to reach the
+ * route error boundary from a browser: the failure happens during the Server
+ * Component render, where request interception cannot reach.
+ */
+const UNREACHABLE_API = 'http://127.0.0.1:59999';
+
+const server = (port: number, env?: Record<string, string>) => ({
+  // The build is the e2e script's job, not a server's. Two servers, one
+  // `.next` directory: whichever started second would race the other's build.
+  command: `npm run start -- --port ${port}`,
+  url: `http://127.0.0.1:${port}`,
+  reuseExistingServer: !process.env.CI,
+  timeout: 120_000,
+  ...(env === undefined ? {} : { env }),
+});
+
 export default defineConfig({
   testDir: './e2e',
   // One worker, no parallelism: the in-memory adapter is a per-process
@@ -38,10 +57,15 @@ export default defineConfig({
         {
           name: 'chromium',
           // The in-memory suite, and only it. The smoke spec needs a running
-          // stack, so running it here would fail for the right reason at the
-          // wrong time.
-          testIgnore: /smoke\.spec\.ts/,
+          // stack and the offline spec needs a broken one, so running either
+          // here would fail for the right reason at the wrong time.
+          testIgnore: [/smoke\.spec\.ts/, /backend-unreachable\.spec\.ts/],
           use: { ...devices['Desktop Chrome'] },
+        },
+        {
+          name: 'backend-unreachable',
+          testMatch: /backend-unreachable\.spec\.ts/,
+          use: { ...devices['Desktop Chrome'], baseURL: 'http://127.0.0.1:3101' },
         },
       ],
   // Absent for the smoke run: Compose is already serving, and starting a
@@ -49,11 +73,9 @@ export default defineConfig({
   ...(smoke
     ? {}
     : {
-        webServer: {
-          command: 'npm run build && npm run start -- --port 3100',
-          url: 'http://127.0.0.1:3100',
-          reuseExistingServer: !process.env.CI,
-          timeout: 180_000,
-        },
+        webServer: [
+          server(3100),
+          server(3101, { JOBTRACKER_API_URL: UNREACHABLE_API }),
+        ],
       }),
 });

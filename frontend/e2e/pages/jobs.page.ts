@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Locator, Page, Response } from '@playwright/test';
 
 /**
  * Every selector comes from the data-testid contract in design A8. No CSS
@@ -9,6 +9,15 @@ export class JobsPage {
 
   async goto(): Promise<void> {
     await this.page.goto('/jobs');
+  }
+
+  /**
+   * Returns the response so a caller can assert the status code. A custom 404
+   * that renders while the server answered 200 would look right in the browser
+   * and be wrong for every crawler and every client that reads the status.
+   */
+  async gotoJob(id: string): Promise<Response | null> {
+    return this.page.goto(`/jobs/${id}`);
   }
 
   get root(): Locator {
@@ -160,6 +169,29 @@ export class JobsPage {
     return this.page
       .locator('[data-testid^="job-row-"][data-testid$="-title"]')
       .filter({ hasText: title });
+  }
+
+  /** app/jobs/not-found.tsx, reached through notFound() in [id]/page.tsx. */
+  get notFound(): Locator {
+    return this.page.getByTestId('jobs-not-found');
+  }
+
+  get backToList(): Locator {
+    return this.page.getByTestId('jobs-not-found-back');
+  }
+
+  /**
+   * app/jobs/error.tsx. Anchored on the retry button rather than on the
+   * `jobs-error` region: JobsErrorBoundary claims that same testid for the
+   * in-page table failure, so the region alone does not say which of the two
+   * took over. The retry belongs to the route boundary only.
+   */
+  get routeErrorRetry(): Locator {
+    return this.page.getByTestId('jobs-error-retry');
+  }
+
+  get errorRegion(): Locator {
+    return this.page.getByTestId('jobs-error');
   }
 
   /**

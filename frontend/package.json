@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "test:e2e": "playwright test",
+    "test:e2e": "npm run build && playwright test",
     "test:smoke": "SMOKE_BASE_URL=http://127.0.0.1:3000 playwright test"
   },
   "dependencies": {
