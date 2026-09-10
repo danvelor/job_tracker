@@ -9,6 +9,7 @@ import { CompleteJobModal } from '../../features/complete-job';
 import { CreateJobModal } from '../../features/create-job';
 import { JobFilterBar } from '../../features/filter-jobs';
 import { useJobsPage } from '../../hooks/use-jobs-page.hook';
+import { JobsLoadMore } from '../molecules/jobs-load-more.component';
 import { JobRowActions } from './job-row-actions.component';
 import { JobsErrorBoundary } from './jobs-error-boundary.component';
 import { JobsTable } from './jobs-table.component';
@@ -60,6 +61,10 @@ export function JobsClient({
           )}
         />
       </JobsErrorBoundary>
+
+      {page.hasMore ? (
+        <JobsLoadMore isLoading={page.isLoading} onLoadMore={page.loadMore} />
+      ) : null}
 
       {page.create.isOpen ? (
         <CreateJobModal

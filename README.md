@@ -68,17 +68,17 @@ That is what lets the browser suite run with neither backend nor database.
 ## Verify it
 
 ```bash
-# Backend: 310 tests — domain, application, architecture, integration
+# Backend: 313 tests — domain, application, architecture, integration
 dotnet test backend/JobTracker.sln
 
-# Frontend: 240 tests, with an 80% coverage gate that fails the run
+# Frontend: 246 tests, with an 80% coverage gate that fails the run
 npm --prefix frontend run test:coverage
 
 # Types. Separate on purpose: expect-type assertions fail at compile time,
 # so a broken type test leaves Jest green
 npm --prefix frontend run typecheck
 
-# Browser: 14 tests. Ten against the in-memory adapter, and four against a
+# Browser: 18 tests. Fourteen against the in-memory adapter, and four against a
 # second server whose API url points nowhere — the only faithful way to reach
 # app/jobs/error.tsx, since the failure happens in the Server Component render
 npm --prefix frontend run test:e2e
@@ -155,7 +155,7 @@ The full diagram, plus SOLID, GRASP, GoF and DDD analysis, is in
 
 ## Decisions and trade-offs
 
-Thirty-nine decisions are recorded with their alternatives, rationale and cost
+Forty decisions are recorded with their alternatives, rationale and cost
 in [`context/architecture.md` §11](context/architecture.md). The ones a reviewer
 is most likely to want explained:
 
