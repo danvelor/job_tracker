@@ -26,11 +26,10 @@ RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 --ingroup nodejs nextjs
 USER nextjs
 
-# The three pieces standalone output produces: the server and its traced
-# dependencies, the static assets it does not serve itself, and public/.
+# What standalone output produces: the server with its traced dependencies,
+# and the static assets it does not serve itself. There is no public/ to copy.
 COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=build --chown=nextjs:nodejs /app/public ./public
 
 # Not decoration: the standalone server binds localhost by default, and a
 # container that binds localhost is a container nothing outside it can reach.
