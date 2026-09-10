@@ -6,7 +6,6 @@ using MediatR;
 
 namespace JobTracker.Modules.Jobs.Application.Notifications;
 
-/// <summary>The unit of work a background job carries out: one send.</summary>
 public sealed record SendNotificationCommand(Guid NotificationId) : IRequest<Result>;
 
 internal sealed class SendNotificationCommandHandler(
@@ -24,10 +23,6 @@ internal sealed class SendNotificationCommandHandler(
             return Result.Failure(NotificationErrors.NotFound);
         }
 
-        // A retry of an already-sent notification is a duplicate message to a
-        // real person, so the aggregate refuses it and this reports success:
-        // there is nothing left to do, and reporting failure would make the
-        // background job retry forever.
         if (notification.Status != NotificationStatus.Pending)
         {
             return Result.Success();

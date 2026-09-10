@@ -16,11 +16,6 @@ using Microsoft.Extensions.Options;
 
 namespace JobTracker.IntegrationTests.Pipeline;
 
-/// <summary>
-/// FR-8 through the real pipeline: save, drain, read the table. The publisher
-/// here is the one handler under test rather than a container, so a failure
-/// names the handler instead of the wiring.
-/// </summary>
 public sealed class NotificationPipelineTests(PostgresFixture postgres)
     : IntegrationTestBase(postgres)
 {
@@ -59,12 +54,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
         Context.ChangeTracker.Clear();
     }
 
-    /// <summary>
-    /// Reloads before mutating. The drain clears the change tracker, so the
-    /// instance Seed returned is detached by then and a Complete on it would
-    /// be saved by nobody — which is how the first version of these tests
-    /// asserted against an event that was never raised.
-    /// </summary>
     private async Task CompleteTheJob(Guid id)
     {
         var job = await new JobRepository(Context).GetByIdAsync(id);
@@ -82,8 +71,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
 
     private Task ResetProcessedOn() =>
         Context.Database.ExecuteSqlAsync($"update jobs.outbox_messages set processed_on = null");
-
-    // ---- FR-8 ------------------------------------------------------------
 
     [Fact]
     public async Task Creating_a_job_notifies_the_assignee()
@@ -106,8 +93,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
 
         await Drain();
 
-        // A message saying only "you have a job" makes the crew open the app to
-        // find out which one, which is most of the value of notifying at all.
         (await Context.Notifications.SingleAsync()).Body.Should().Contain("Ridge tile replacement");
     }
 
@@ -123,8 +108,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
         (await theirs.Notifications.CountAsync()).Should().Be(0);
     }
 
-    // ---- case 9 of architecture 8.2 --------------------------------------
-
     [Fact]
     public async Task A_replayed_creation_does_not_notify_twice()
     {
@@ -135,9 +118,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
 
         await Drain();
 
-        // The whole of 4.5: the key is stable across a replay, so the second
-        // pass finds the row and stops. A test that never replays never checks
-        // it, and at-least-once delivery guarantees production will.
         (await Context.Notifications.CountAsync()).Should().Be(1);
     }
 
@@ -151,9 +131,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
 
         await Drain();
 
-        // If the handler let the constraint violation escape, the outbox row
-        // would stay unprocessed and the drain would retry it every poll until
-        // somebody noticed.
         var unprocessed = await Context.Database.SqlQuery<int>(
             $"""select count(*)::int as "Value" from jobs.outbox_messages where processed_on is null""")
             .SingleAsync();
@@ -176,13 +153,8 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
 
         var save = async () => await Context.SaveChangesAsync();
 
-        // The handler's ExistsAsync check is a courtesy; this is the guarantee.
-        // Two workers racing past the check at the same moment are stopped
-        // here and nowhere else.
         await save.Should().ThrowAsync<DbUpdateException>();
     }
-
-    // ---- sending ---------------------------------------------------------
 
     [Fact]
     public async Task Sending_moves_the_record_from_Pending_to_Sent()
@@ -209,9 +181,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
 
         await RunQueuedSends(replay: true);
 
-        // Hangfire retries a job whose result it did not record. Reporting
-        // failure here would have it retry for ever; re-sending would tell a
-        // real person twice.
         (await Context.Notifications.AsNoTracking().SingleAsync()).SentAt.Should().Be(sentAt);
     }
 
@@ -245,10 +214,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
         Context.ChangeTracker.Clear();
     }
 
-    /// <summary>
-    /// Runs nothing; it records. The test decides when a send happens, which is
-    /// what makes these assertions deterministic without a job server.
-    /// </summary>
     private sealed class InlineQueue : IBackgroundQueue
     {
         private readonly List<SendNotificationCommand> _queued = [];
@@ -259,9 +224,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
             where TRequest : notnull =>
             _queued.Add((SendNotificationCommand)(object)request);
 
-        // The test decides when a send happens, so nothing needs dispatching
-        // here. The processor still calls it, which keeps the production
-        // ordering exercised rather than assumed.
         public void Flush() { }
 
         public IEnumerable<SendNotificationCommand> Drain() => _queued.ToList();
@@ -275,11 +237,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
             Task.FromResult(SendOutcome.Refused("the transport refused the address"));
     }
 
-    /// <summary>
-    /// Publishes to exactly one handler. A DI container would prove the wiring
-    /// too, and would make a failure here ambiguous between the handler and the
-    /// registration — the wiring has its own test.
-    /// </summary>
     private sealed class SingleHandlerPublisher(
         INotificationHandler<JobCreatedDomainEvent> handler) : IPublisher
     {
@@ -294,8 +251,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
                 : Task.CompletedTask;
     }
 
-    // ---- FR-10 -----------------------------------------------------------
-
     [Fact]
     public async Task Completing_a_job_notifies_the_customer_at_their_email()
     {
@@ -306,7 +261,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
 
         await DrainCompletions();
 
-        // The email, not the name: this one leaves the building.
         var customer = await Context.Notifications.AsNoTracking()
             .SingleAsync(notification => notification.Recipient.Contains("@"));
         customer.Recipient.Should().Be("ops@acme.test");
@@ -322,8 +276,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
 
         await DrainCompletions();
 
-        // Two rows, two recipients, one unique constraint. If the key were the
-        // source event alone the second would be rejected as a duplicate.
         (await Context.Notifications.CountAsync()).Should().Be(2);
     }
 
@@ -353,8 +305,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
 
         await DrainCompletions(bus);
 
-        // The whole of architecture 4.1: what crosses the boundary is a record
-        // of primitives, and Billing compiles against that and nothing else.
         var published = bus.Published.Should().ContainSingle().Subject;
         published.JobId.Should().Be(job.Id);
         published.StartedAt.Should().Be(Now.AddHours(1));
@@ -417,8 +367,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
         }
     }
 
-    // ---- FR-12 -----------------------------------------------------------
-
     [Fact]
     public async Task Cancelling_a_job_notifies_the_assignee()
     {
@@ -429,9 +377,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
 
         await DrainCancellations();
 
-        // Two rows for one recipient: the unique constraint is keyed on the
-        // source event as well as the name, so the crew can be told twice
-        // about the same job for two different reasons.
         var cancellation = await Context.Notifications.AsNoTracking()
             .SingleAsync(notification => notification.Subject.Contains("cancelled"));
         cancellation.Recipient.Should().Be("J. Ortiz");
@@ -448,9 +393,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
 
         await DrainCancellations();
 
-        // BR-5 makes the reason mandatory so a cancellation can be reviewed
-        // later. The crew is the first reviewer, and a message that withheld
-        // it would send them looking for the answer elsewhere.
         var cancellation = await Context.Notifications.AsNoTracking()
             .SingleAsync(notification => notification.Subject.Contains("cancelled"));
         cancellation.Body.Should().Contain("Ridge tile replacement");
@@ -483,9 +425,6 @@ public sealed class NotificationPipelineTests(PostgresFixture postgres)
 
         await DrainCancellations();
 
-        // A Draft job never reached a crew, so there is nobody to tell. The
-        // handler returns quietly rather than leaving the outbox row to be
-        // retried for ever against an assignee that will never exist.
         (await Context.Notifications.CountAsync()).Should().Be(1);
     }
 

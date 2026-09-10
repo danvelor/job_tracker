@@ -6,14 +6,6 @@ import type { ErrorInfo, ReactNode } from 'react';
 type Props = { readonly children: ReactNode };
 type State = { readonly message: string | null };
 
-/**
- * Wraps the table only (assessment line 158), so a render failure in one table
- * does not blank the page: the header and the filters survive.
- *
- * A class because React has no hook equivalent for componentDidCatch. It is
- * the one component in the view that holds state, and it is not an organism in
- * the design A3 sense — it renders no domain markup.
- */
 export class JobsErrorBoundary extends Component<Props, State> {
   override state: State = { message: null };
 

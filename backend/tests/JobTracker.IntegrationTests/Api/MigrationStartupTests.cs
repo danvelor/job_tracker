@@ -9,12 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace JobTracker.IntegrationTests.Api;
 
-/// <summary>
-/// NFR-7: a reviewer runs `docker compose up` and nothing else. Migrations at
-/// startup are the difference between one command and a README step people
-/// skip — and they are the piece most likely to be wrong, because two modules
-/// keep two histories in two schemas.
-/// </summary>
 [Collection(PostgresCollection.Name)]
 public sealed class MigrationStartupTests(PostgresFixture postgres) : IAsyncLifetime
 {
@@ -63,9 +57,6 @@ public sealed class MigrationStartupTests(PostgresFixture postgres) : IAsyncLife
 
         await Migrate();
 
-        // A migrator that ran one module would leave a system that starts,
-        // serves a job list, and fails on the first completed job — three
-        // layers from the cause.
         (await TablesIn("jobs")).Should().BeGreaterThan(0);
         (await TablesIn("billing")).Should().BeGreaterThan(0);
     }
@@ -78,8 +69,6 @@ public sealed class MigrationStartupTests(PostgresFixture postgres) : IAsyncLife
 
         var again = async () => await Migrate();
 
-        // Compose restarts a failed container. A migrator that threw on the
-        // second run would turn one transient fault into a crash loop.
         await again.Should().NotThrowAsync();
     }
 
@@ -90,9 +79,6 @@ public sealed class MigrationStartupTests(PostgresFixture postgres) : IAsyncLife
 
         await Migrate();
 
-        // Walkthrough step 2 picks a crew and a customer. A stack that migrated
-        // but did not seed fails there, and the message would be about a
-        // foreign key rather than about an empty dropdown.
         using var scope = _api.Services.CreateScope();
         using var _ = scope.ServiceProvider.GetRequiredService<ITenantContextSetter>()
             .Use(RosterSeed.DevelopmentOrganization);
@@ -117,9 +103,6 @@ public sealed class MigrationStartupTests(PostgresFixture postgres) : IAsyncLife
              where table_name = '__EFMigrationsHistory' order by table_schema
              """).ToListAsync();
 
-        // One history per module, each in the schema it owns. A shared history
-        // is how each migrator reads the other's applied migrations as its own
-        // and decides there is nothing to do.
         histories.Should().Equal("billing", "jobs");
     }
 }

@@ -8,11 +8,6 @@ namespace JobTracker.Modules.Jobs.Application.Jobs.StartJob;
 
 public sealed record StartJobCommand(Guid JobId, Guid OrganizationId) : IRequest<Result>;
 
-/// <summary>
-/// No validator: the command carries only identifiers, and BR-3 — that only a
-/// Scheduled job can start — is the aggregate's to enforce. A validator here
-/// would be a second place to change the rule.
-/// </summary>
 internal sealed class StartJobCommandHandler(
     IJobRepository jobs,
     IUnitOfWork unitOfWork,
@@ -29,8 +24,6 @@ internal sealed class StartJobCommandHandler(
         var started = job.Start(time.GetUtcNow());
         if (started.IsFailure)
         {
-            // Nothing changed, so nothing is saved: a SaveChanges here would
-            // write an unchanged aggregate and drain an outbox with no event.
             return started;
         }
 

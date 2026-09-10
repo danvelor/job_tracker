@@ -33,8 +33,6 @@ public sealed class ValueObjectTests
     [Fact]
     public void Equal_values_share_a_hash_code()
     {
-        // Without this, two equal values land in different dictionary buckets
-        // and structural equality stops meaning anything in a HashSet.
         new Money(10m, "USD").GetHashCode()
             .Should().Be(new Money(10m, "USD").GetHashCode());
     }

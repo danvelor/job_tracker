@@ -18,10 +18,8 @@ export type HttpJobsAdapterConfig = {
   readonly token?: TokenSource;
 };
 
-/** The development organization the seed migration creates (RosterSeed). */
 const DEVELOPMENT_ORGANIZATION = '11111111-1111-1111-1111-111111111111';
 
-/** What `GET /api/jobs` returns per row: the address is flat on the wire. */
 type JobRowResponse = {
   readonly id: string;
   readonly title: string;
@@ -53,10 +51,6 @@ type JobDetailResponse = Omit<JobRowResponse, 'photoCount'> & {
   }[];
 };
 
-/**
- * The same word the in-memory adapter uses. The two must agree on what the user
- * reads, not only on what the types say.
- */
 const UNASSIGNED = 'Unassigned';
 
 const toSummary = (row: JobRowResponse): JobSummary => ({
@@ -98,9 +92,6 @@ const toDetail = (body: JobDetailResponse): JobDetail => ({
 function searchParams(query: JobSearchQuery): string {
   const params = new URLSearchParams();
 
-  // Set, never assigned blank. `?text=` is a different request from no text at
-  // all, and the API would be within its rights to read it as a search for the
-  // empty string.
   const set = (key: string, value: string | undefined | null): void => {
     if (value !== undefined && value !== null && value !== '') {
       params.set(key, value);
@@ -122,16 +113,6 @@ function searchParams(query: JobSearchQuery): string {
   return params.toString();
 }
 
-/**
- * The other implementation of `JobsPort`. It agrees with the in-memory adapter
- * behaviourally — the same refusal produces the same `CoreError.kind` — which
- * is what lets the end-to-end suite run against one and production against the
- * other (D-01).
- *
- * Nothing here throws. A refusal, a server fault and an unreachable host are
- * all `Result` failures, because a thrown error escapes into an error boundary
- * and loses the code the user would quote.
- */
 export function createHttpJobsAdapter(config: HttpJobsAdapterConfig): JobsPort {
   const baseUrl = config.baseUrl.replace(/\/+$/, '');
   const token =
@@ -156,17 +137,10 @@ export function createHttpJobsAdapter(config: HttpJobsAdapterConfig): JobsPort {
     try {
       const first = await send();
 
-      // The development token lives an hour and the Next server outlives it,
-      // so a 401 is far more often an expired token than a refused one. One
-      // refreshed retry is the difference between a page that recovers by
-      // itself and a page that needs the container restarted. Exactly one: a
-      // 401 that is not about expiry must not loop.
       const response = first.status === 401 ? await send({ refresh: true }) : first;
 
       return response.ok ? ok(await read(response)) : err(await toCoreError(response));
     } catch (cause: unknown) {
-      // A refused connection, a DNS failure, a token endpoint that is down.
-      // None of them has a status, and all of them are still Results.
       return err(toTransportError(cause));
     }
   }
@@ -199,8 +173,6 @@ export function createHttpJobsAdapter(config: HttpJobsAdapterConfig): JobsPort {
     },
 
     create(input: CreateJobInput): Promise<Result<string, CoreError>> {
-      // The port nests the address; the API takes it flat. Mapping here is
-      // what keeps the wire shape out of the slices.
       return request(
         '/api/jobs',
         {

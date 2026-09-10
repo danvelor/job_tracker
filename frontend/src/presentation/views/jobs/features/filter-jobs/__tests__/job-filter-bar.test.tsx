@@ -21,7 +21,6 @@ describe('JobFilterBar', () => {
 
     expect(screen.getByTestId('filter-status-select')).toBeInTheDocument();
     expect(screen.getByTestId('filter-search-input')).toBeInTheDocument();
-    // The root does not know the set: nothing renders that was not asked for.
     expect(screen.queryByTestId('filter-date-from')).not.toBeInTheDocument();
     expect(screen.queryByTestId('filter-assignee-select')).not.toBeInTheDocument();
   });

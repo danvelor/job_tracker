@@ -3,7 +3,6 @@ import type { CoreError, Result } from '@/core/domain/result.type';
 import type { CreateJobInput } from '@/core/application/ports/jobs.port';
 import { createInMemoryJobsAdapter } from '../in-memory-jobs.adapter';
 
-// No cast: isOk is a type guard, so narrowing is what produces the value.
 const unwrap = <T>(result: Result<T, CoreError>): T => {
   if (!isOk(result)) {
     throw new Error(`expected ok, received ${JSON.stringify(result.error)}`);
@@ -212,8 +211,6 @@ describe('InMemoryJobsAdapter', () => {
     const id = unwrap(await adapter.create(validInput));
     await adapter.cancel(id, 'Weather');
 
-    // The other BR-2 case goes through start(); this one goes through
-    // cancel(), and each has its own terminal guard to exercise.
     const again = await adapter.cancel(id, 'Changed our mind');
     expect(isOk(again)).toBe(false);
     if (!isOk(again)) expect(again.error.kind).toBe('conflict');
@@ -241,9 +238,6 @@ describe('InMemoryJobsAdapter', () => {
   it('reports not-found for an unknown id', async () => {
     const adapter = createInMemoryJobsAdapter();
 
-    // Widened to a common element type: the four calls return Results over
-    // different values, and a heterogeneous array would give isOk a union it
-    // cannot narrow. The value is irrelevant here — only the failure is.
     const results: Result<unknown, CoreError>[] = [
       await adapter.getById('missing'),
       await adapter.start('missing'),

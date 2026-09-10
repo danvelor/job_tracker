@@ -7,7 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace JobTracker.IntegrationTests;
 
-/// <summary>Cases 6, 7 and 8 of architecture 8.2.</summary>
 public sealed class SearchTests(PostgresFixture postgres) : IntegrationTestBase(postgres)
 {
     private static readonly DateTimeOffset Now = new(2026, 3, 1, 9, 0, 0, TimeSpan.Zero);
@@ -39,11 +38,6 @@ public sealed class SearchTests(PostgresFixture postgres) : IntegrationTestBase(
         Context.ChangeTracker.Clear();
     }
 
-    /// <summary>
-    /// The aggregate cannot produce a job with no date — Create requires one —
-    /// but the column is nullable and a Draft job has none. The only way to
-    /// build the row the bug in architecture 6.4 is about is to write it.
-    /// </summary>
     private Task Undate(string title) =>
         Context.Database.ExecuteSqlAsync(
             $"update jobs.jobs set scheduled_date = null where title = {title}");
@@ -80,9 +74,6 @@ public sealed class SearchTests(PostgresFixture postgres) : IntegrationTestBase(
     [Fact]
     public async Task Two_jobs_sharing_a_date_are_neither_skipped_nor_repeated()
     {
-        // Comparing the ordered pair rather than the date alone is what makes
-        // this hold. A cursor on the date alone either loses the second row of
-        // the pair or serves it twice.
         var sameDay = new DateOnly(2099, 5, 1);
         await Seed(
             ("A", null, sameDay), ("B", null, sameDay),
@@ -99,16 +90,6 @@ public sealed class SearchTests(PostgresFixture postgres) : IntegrationTestBase(
     [Fact]
     public async Task A_dateless_job_loses_nothing_when_the_whole_list_is_paged()
     {
-        // The regression guard for architecture 6.4. Over a bare column the
-        // keyset comparison (scheduled_date, id) < (cursor_date, cursor_id)
-        // yields NULL rather than true wherever a NULL is involved, and WHERE
-        // discards the row.
-        //
-        // It walks every page instead of checking two, because which page the
-        // dateless job lands on is exactly what the bug changes: PostgreSQL
-        // sorts NULLs first under DESC, so a two-page check finds it sitting at
-        // the top and reports success while the two dated jobs behind it have
-        // silently vanished. Only exhausting the pages catches that.
         await Seed(
             ("Dated A", null, new DateOnly(2099, 5, 1)),
             ("Dated B", null, new DateOnly(2099, 4, 1)),
@@ -118,8 +99,6 @@ public sealed class SearchTests(PostgresFixture postgres) : IntegrationTestBase(
         var seen = new List<string>();
         string? cursor = null;
 
-        // Bounded so a cursor that fails to advance ends as a failed assertion
-        // rather than as a hung suite.
         for (var page = 0; page < 6; page++)
         {
             var rows = await Repository().SearchAsync(Criteria(limit: 1, cursor: cursor));
@@ -145,9 +124,6 @@ public sealed class SearchTests(PostgresFixture postgres) : IntegrationTestBase(
 
         var rows = await Repository().SearchAsync(Criteria());
 
-        // A job with no date belongs at the end of a schedule. PostgreSQL puts
-        // NULLs first under DESC, which would put the least actionable job at
-        // the top of the list.
         rows.Select(row => row.Title).Should().Equal("Dated", "Undated");
     }
 
@@ -172,8 +148,6 @@ public sealed class SearchTests(PostgresFixture postgres) : IntegrationTestBase(
 
         var rows = await Repository().SearchAsync(Criteria(text: "replace"));
 
-        // to_tsvector stems, and a LIKE '%replace%' would not have found
-        // "replacing". This is what the index buys beyond a substring scan.
         rows.Should().ContainSingle();
     }
 
@@ -211,8 +185,6 @@ public sealed class SearchTests(PostgresFixture postgres) : IntegrationTestBase(
 
         var rows = await Repository().SearchAsync(Criteria());
 
-        // FR-6: a list showing a UUID is a list nobody can read. The name comes
-        // from a correlated subquery, not from loading the roster.
         rows.Single().AssigneeName.Should().Be("J. Ortiz");
     }
 
@@ -242,9 +214,6 @@ public sealed class SearchTests(PostgresFixture postgres) : IntegrationTestBase(
 
         await Repository().SearchAsync(Criteria());
 
-        // Assessment line 208: read-optimized, no tracking. A tracked read puts
-        // every row in the change tracker and the next SaveChanges considers
-        // writing all of them back.
         Context.ChangeTracker.Entries().Should().BeEmpty();
     }
 
@@ -261,8 +230,6 @@ public sealed class SearchTests(PostgresFixture postgres) : IntegrationTestBase(
 
         var rows = await Repository().SearchAsync(Criteria());
 
-        // Theirs is the newer date, so a leak would put it first rather than
-        // hide at the bottom of the page.
         rows.Select(row => row.Title).Should().Equal("Ours");
     }
 
@@ -281,9 +248,6 @@ public sealed class SearchTests(PostgresFixture postgres) : IntegrationTestBase(
 
         var loaded = await Repository().GetByIdAsync(job.Id);
 
-        // Tracked, unlike the read side: this is the aggregate a command is
-        // about to change, and the change tracker is how the unit of work
-        // learns what to write.
         loaded!.Photos.Should().ContainSingle();
         Context.ChangeTracker.Entries().Should().NotBeEmpty();
     }
@@ -301,8 +265,6 @@ public sealed class SearchTests(PostgresFixture postgres) : IntegrationTestBase(
         await new UnitOfWork(Context).SaveChangesAsync();
         var afterSave = await Context.Jobs.AsNoTracking().CountAsync();
 
-        // The repository stages; the unit of work commits. If AddAsync saved on
-        // its own, two commands in one transaction could not be atomic.
         beforeSave.Should().Be(0);
         afterSave.Should().Be(1);
     }
@@ -310,11 +272,6 @@ public sealed class SearchTests(PostgresFixture postgres) : IntegrationTestBase(
     [Fact]
     public async Task A_photo_added_to_an_already_persisted_job_is_inserted_rather_than_updated()
     {
-        // The gap that let a real bug through. Every earlier test completed a
-        // job before adding it, so the whole graph was Added and EF never had
-        // to decide. Completing a job that is already in the database is what
-        // the API actually does, and there EF emitted UPDATE for a row that
-        // did not exist yet.
         var job = Job.Create(
             "Ridge tile replacement", null,
             Address.Create("12 Elm St", "Springfield", "IL", "62701", 39.78m, -89.65m).Value,
@@ -335,9 +292,6 @@ public sealed class SearchTests(PostgresFixture postgres) : IntegrationTestBase(
     [Fact]
     public async Task Updating_a_persisted_job_through_SaveChanges_succeeds_despite_the_trigger()
     {
-        // The other half of the same gap: no test drove a state transition
-        // through SaveChanges, only through raw SQL. That is the path every
-        // transition endpoint takes, and it was unexercised.
         var job = Job.Create(
             "Ridge tile replacement", null,
             Address.Create("12 Elm St", "Springfield", "IL", "62701", 39.78m, -89.65m).Value,

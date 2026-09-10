@@ -10,10 +10,6 @@ public static class NotificationErrors
     public static readonly Error SubjectRequired = Error.Validation(
         "notification.subject-required", "A notification needs a subject");
 
-    /// <summary>
-    /// The terminal-state rule. Conflict rather than Validation: nothing the
-    /// caller passed was wrong, the notification had already been resolved.
-    /// </summary>
     public static readonly Error NotFound = Error.NotFound(
         "notification.not-found", "No notification with that identifier");
 

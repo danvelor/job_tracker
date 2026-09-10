@@ -68,10 +68,6 @@ public sealed class ValidationBehaviorTests
     [Fact]
     public async Task A_failing_generic_request_returns_a_well_formed_failure()
     {
-        // The behaviour builds a failure for a Result<T> response, and the
-        // plan's self-review flagged that the plain Result it constructs
-        // cannot be cast to Result<Guid>. This is the test that proves the
-        // construction is type-correct rather than throwing at the cast.
         var behavior = new ValidationBehavior<ValuedProbe, Result<Guid>>([new ValuedProbeValidator()]);
 
         var result = await behavior.Handle(
@@ -111,9 +107,6 @@ public sealed class ValidationBehaviorTests
         var result = await behavior.Handle(
             new Probe(""), () => Task.FromResult(Result.Success()), CancellationToken.None);
 
-        // Without the map a form can only show one banner. With it, the field
-        // that failed is the field that lights up — and Presentation lifts it
-        // straight into the `errors` member of a ProblemDetails.
         result.Error.FieldErrors.Should().ContainKey(nameof(Probe.Name));
         result.Error.FieldErrors![nameof(Probe.Name)].Should().NotBeEmpty();
     }
@@ -126,9 +119,6 @@ public sealed class ValidationBehaviorTests
         var result = await behavior.Handle(
             new Probe(""), () => Task.FromResult(Result.Success()), CancellationToken.None);
 
-        // Grouping by field rather than keeping the last message: telling
-        // someone one problem at a time hides the way forward, and that
-        // applies within a field as much as across them.
         result.Error.FieldErrors![nameof(Probe.Name)].Should().HaveCount(2);
     }
 

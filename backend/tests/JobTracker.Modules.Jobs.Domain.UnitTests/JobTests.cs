@@ -27,13 +27,9 @@ public sealed class JobTests
 
     private static IEnumerable<NewJobPhoto> NoPhotos() => [];
 
-    // ---- creation --------------------------------------------------------
-
     [Fact]
     public void A_created_job_is_Scheduled_rather_than_Draft()
     {
-        // D-14: the creation form collects exactly what Scheduled requires, and
-        // the acceptance walkthrough cannot complete a job never scheduled.
         AScheduledJob().Status.Should().Be(JobStatus.Scheduled);
     }
 
@@ -69,15 +65,11 @@ public sealed class JobTests
     [Fact]
     public void A_job_scheduled_for_today_is_accepted()
     {
-        // BR-1 says "in the past", and today is not past. An off-by-one here
-        // would refuse every same-day job, which is most of them.
         var today = DateOnly.FromDateTime(Now.UtcDateTime);
 
         Job.Create("Roof repair", null, AnAddress(), today, Assignee, Customer, Organization, Now)
             .IsSuccess.Should().BeTrue();
     }
-
-    // ---- start -----------------------------------------------------------
 
     [Fact]
     public void A_Scheduled_job_starts_and_records_when()
@@ -96,8 +88,6 @@ public sealed class JobTests
     {
         AnInProgressJob().Start(Now.AddHours(2)).Error.Should().Be(JobErrors.NotScheduled);
     }
-
-    // ---- complete --------------------------------------------------------
 
     [Fact]
     public void An_InProgress_job_completes_with_a_signature()
@@ -149,8 +139,6 @@ public sealed class JobTests
             .Which.Should().BeOfType<JobCompletedDomainEvent>();
     }
 
-    // ---- cancel ----------------------------------------------------------
-
     [Fact]
     public void A_Scheduled_job_cancels_with_a_reason()
     {
@@ -190,8 +178,6 @@ public sealed class JobTests
     [Fact]
     public void The_cancellation_event_carries_the_assignee_who_must_be_told()
     {
-        // FR-12. The handler notifies the crew, and an event that named only
-        // the job would make it reload the aggregate to find out whom.
         var job = AScheduledJob();
         job.ClearDomainEvents();
 
@@ -201,8 +187,6 @@ public sealed class JobTests
             .Which.Should().BeOfType<JobCancelledDomainEvent>()
             .Which.AssigneeId.Should().Be(Assignee);
     }
-
-    // ---- BR-2, terminal states -------------------------------------------
 
     [Fact]
     public void A_completed_job_refuses_every_further_transition()
@@ -235,12 +219,8 @@ public sealed class JobTests
 
         job.Cancel(Now.AddHours(2), "again");
 
-        // A refused transition must not announce a consequence that did not
-        // happen: the outbox would carry it downstream regardless.
         job.DomainEvents.Should().BeEmpty();
     }
-
-    // ---- reschedule ------------------------------------------------------
 
     [Fact]
     public void A_Scheduled_job_can_be_rescheduled()
@@ -262,14 +242,9 @@ public sealed class JobTests
             .Error.Should().Be(JobErrors.ScheduledInThePast);
     }
 
-    // ---- reachability ----------------------------------------------------
-
     [Fact]
     public void Photos_are_exposed_read_only_and_have_no_other_way_in()
     {
-        // Line 185: JobPhoto is reachable only through the aggregate root.
-        // There is no AddPhoto — photos arrive through Complete, which is the
-        // only moment the business produces them.
         typeof(Job).GetProperty(nameof(Job.Photos))!.PropertyType
             .Should().Be(typeof(IReadOnlyCollection<JobPhoto>));
 
@@ -277,16 +252,9 @@ public sealed class JobTests
             .Should().NotContain("AddPhoto");
     }
 
-    // ---- errors name the input that failed --------------------------------
-
     [Fact]
     public void A_refusal_names_the_field_the_caller_must_fix()
     {
-        // Design A5 point 3: the form lights up the field that failed rather
-        // than showing a banner. The aggregate is what knows which value was
-        // wrong, and the field name is a contract with the client in the same
-        // way the error code already is — so it belongs on the Error and not
-        // in a translation table somewhere in Presentation.
         JobErrors.ScheduledInThePast.FieldErrors.Should().ContainKey("ScheduledDate");
         JobErrors.TitleRequired.FieldErrors.Should().ContainKey("Title");
         JobErrors.SignatureRequired.FieldErrors.Should().ContainKey("SignatureUrl");
@@ -296,8 +264,6 @@ public sealed class JobTests
     [Fact]
     public void Every_named_field_matches_a_property_the_client_actually_sends()
     {
-        // A field name nothing on the wire is called is worse than none: the
-        // form highlights nothing and the developer trusts the highlight.
         JobErrors.ScheduledInThePast.FieldErrors!.Keys
             .Should().BeSubsetOf([nameof(Job.ScheduledDate)]);
         JobErrors.SignatureRequired.FieldErrors!.Keys
@@ -307,8 +273,6 @@ public sealed class JobTests
     [Fact]
     public void A_state_refusal_names_no_field_because_no_field_is_wrong()
     {
-        // BR-2 and BR-3 are about the job, not about the request. Naming a
-        // field would tell the user to change something that was fine.
         JobErrors.Terminal.FieldErrors.Should().BeNull();
         JobErrors.NotScheduled.FieldErrors.Should().BeNull();
         JobErrors.NotFound.FieldErrors.Should().BeNull();

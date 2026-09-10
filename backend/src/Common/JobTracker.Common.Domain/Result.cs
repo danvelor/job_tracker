@@ -1,9 +1,5 @@
 namespace JobTracker.Common.Domain;
 
-/// <summary>
-/// Success or failure as a value. Expected failures are returned; exceptions
-/// are reserved for defects (architecture 9.2).
-/// </summary>
 public class Result
 {
     protected Result(bool isSuccess, Error error)
@@ -44,10 +40,6 @@ public sealed class Result<T> : Result
     internal Result(T? value, bool isSuccess, Error error) : base(isSuccess, error) =>
         _value = value;
 
-    /// <summary>
-    /// Throws when read from a failure. That is a defect — the caller did not
-    /// check IsSuccess — not an expected failure, so an exception is right.
-    /// </summary>
     public T Value =>
         IsSuccess
             ? _value!

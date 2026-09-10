@@ -6,7 +6,6 @@ using JobTracker.Modules.Jobs.Infrastructure.Configurations;
 
 namespace JobTracker.IntegrationTests.Api;
 
-/// <summary>One test per row of design B6, plus the refusals each row names.</summary>
 [Collection(PostgresCollection.Name)]
 public sealed class JobEndpointTests(PostgresFixture postgres) : IAsyncLifetime
 {
@@ -48,15 +47,12 @@ public sealed class JobEndpointTests(PostgresFixture postgres) : IAsyncLifetime
     private static async Task<JsonElement> Body(HttpResponseMessage response) =>
         await response.Content.ReadFromJsonAsync<JsonElement>();
 
-    // ---- create ----------------------------------------------------------
-
     [Fact]
     public async Task Creating_a_job_answers_201_with_a_location_the_client_can_follow()
     {
         var response = await _client.PostAsJsonAsync("/api/jobs", AValidJob());
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        // 201 without a Location is a 201 the client cannot follow.
         response.Headers.Location!.ToString().Should().StartWith("/api/jobs/");
     }
 
@@ -68,9 +64,6 @@ public sealed class JobEndpointTests(PostgresFixture postgres) : IAsyncLifetime
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
-        // BR-1 lives in the aggregate, not in a validator, and the refusal
-        // still names the field — which is what lets the form light up the
-        // date rather than showing a banner (design A5 point 3).
         (await Body(response)).GetProperty("errors").GetProperty("ScheduledDate")
             .GetArrayLength().Should().BeGreaterThan(0);
     }
@@ -85,15 +78,9 @@ public sealed class JobEndpointTests(PostgresFixture postgres) : IAsyncLifetime
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
-        // This one comes from CreateJobCommandValidator rather than from the
-        // aggregate, and proves the validators were registered at all. They
-        // are internal by architecture 9.1, and without includeInternalTypes
-        // FluentValidation finds none — every invalid request would answer 201.
         (await Body(response)).GetProperty("errors").GetProperty("Title")
             .GetArrayLength().Should().BeGreaterThan(0);
     }
-
-    // ---- read ------------------------------------------------------------
 
     [Fact]
     public async Task A_job_that_does_not_exist_answers_404()
@@ -125,9 +112,6 @@ public sealed class JobEndpointTests(PostgresFixture postgres) : IAsyncLifetime
     {
         var response = await _client.GetAsync("/api/jobs?limit=5&statuses=Elsewhere");
 
-        // An empty list would read as "no jobs match", which is a different
-        // and wrong answer to a typo. Note the Route Handler in the frontend
-        // does the opposite on purpose: it sanitises a URL a user can edit.
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
@@ -141,7 +125,6 @@ public sealed class JobEndpointTests(PostgresFixture postgres) : IAsyncLifetime
 
         var response = await _client.GetAsync("/api/jobs?limit=100000");
 
-        // NFR-5 is not enforceable if the page size is not.
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await Body(response)).GetProperty("items").GetArrayLength().Should().Be(3);
     }
@@ -156,8 +139,6 @@ public sealed class JobEndpointTests(PostgresFixture postgres) : IAsyncLifetime
         items[0].GetProperty("assigneeName").GetString().Should().Be("J. Ortiz");
         items[0].GetProperty("status").GetString().Should().Be("Scheduled");
     }
-
-    // ---- transitions -----------------------------------------------------
 
     [Fact]
     public async Task Starting_a_scheduled_job_answers_204()
@@ -191,8 +172,6 @@ public sealed class JobEndpointTests(PostgresFixture postgres) : IAsyncLifetime
             photos = Array.Empty<object>(),
         });
 
-        // BR-3 through the wire. The request was well-formed; the state
-        // refused it (design B6).
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
@@ -208,8 +187,6 @@ public sealed class JobEndpointTests(PostgresFixture postgres) : IAsyncLifetime
             photos = Array.Empty<object>(),
         });
 
-        // The mirror image of the test above, and the pair is the point: one
-        // status for a malformed request, another for a refused one.
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
@@ -247,11 +224,6 @@ public sealed class JobEndpointTests(PostgresFixture postgres) : IAsyncLifetime
             assigneeId = RosterSeed.AssigneeRuiz,
         });
 
-        // Design B6 asks for 409 on this row and 400 on the create row, for
-        // the same rule. Resolved as 400 in both: BR-1 refuses a value, not a
-        // state — the same date is refused whether the job is new or being
-        // corrected, and the caller fixes it the same way. 409 stays for the
-        // refusals where nothing the caller sent was wrong. Recorded as D-32.
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await Body(response)).GetProperty("errors").GetProperty("ScheduledDate")
             .GetArrayLength().Should().BeGreaterThan(0);
@@ -278,18 +250,12 @@ public sealed class JobEndpointTests(PostgresFixture postgres) : IAsyncLifetime
     {
         var response = await _client.PostAsync($"/api/jobs/{Guid.NewGuid()}/start", null);
 
-        // 409 would tell the caller the job exists and refused, which is a
-        // different fact and an information leak across tenants.
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
-
-    // ---- the walkthrough -------------------------------------------------
 
     [Fact]
     public async Task The_walkthrough_runs_end_to_end_over_HTTP()
     {
-        // Steps 1-3 and 5-8 of architecture 8.1, which is what this plan
-        // unblocks. Steps 4 and 9 need the outbox, and that is plan 4.
         var id = await CreateJob();
 
         (await _client.PostAsync($"/api/jobs/{id}/start", null))

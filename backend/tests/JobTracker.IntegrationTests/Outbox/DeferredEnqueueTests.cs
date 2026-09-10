@@ -10,23 +10,11 @@ using Microsoft.Extensions.Options;
 
 namespace JobTracker.IntegrationTests.Outbox;
 
-/// <summary>
-/// A handler runs inside the drain's transaction, so a row it writes is
-/// invisible to any other connection until that transaction commits. Hangfire
-/// persists a queued job on its own connection and a worker can pick it up
-/// immediately — so an enqueue issued mid-transaction races the commit, and the
-/// worker looks up a notification that is not there yet.
-///
-/// It is not hypothetical. It is what the Compose stack did: both notifications
-/// sat at Pending while every Hangfire job reported success.
-/// </summary>
 public sealed class DeferredEnqueueTests(PostgresFixture postgres) : IntegrationTestBase(postgres)
 {
     [Fact]
     public async Task A_job_enqueued_inside_a_transaction_is_not_visible_until_it_commits()
     {
-        // The race, demonstrated rather than described: a second connection
-        // cannot see the row while the first transaction is open.
         var id = Guid.NewGuid();
 
         await using var transaction = await Context.Database.BeginTransactionAsync();
@@ -51,9 +39,6 @@ public sealed class DeferredEnqueueTests(PostgresFixture postgres) : Integration
 
         queue.Enqueue(new { Work = 1 }, Organization);
 
-        // Nothing goes out mid-transaction. Whoever owns the transaction
-        // flushes after committing, which is the only moment the rows a job
-        // will read are guaranteed to exist.
         queue.Dispatched.Should().BeEmpty();
 
         queue.Flush();
@@ -71,9 +56,6 @@ public sealed class DeferredEnqueueTests(PostgresFixture postgres) : Integration
             new DateTimeOffset(2026, 3, 1, 9, 0, 0, TimeSpan.Zero)).Value);
         await Context.SaveChangesAsync();
 
-        // At flush time, ask a different connection whether the row is there.
-        // That is the only question that matters: a worker starting the instant
-        // Flush returns reads through a connection exactly like this one.
         var queue = new RecordingQueue
         {
             RowVisibleElsewhere = () =>
@@ -113,7 +95,6 @@ public sealed class DeferredEnqueueTests(PostgresFixture postgres) : Integration
         }
     }
 
-    /// <summary>Writes a notification the way the real handlers do, then queues its send.</summary>
     private sealed class RecordingNotificationHandler(
         JobsDbContext context, IBackgroundQueue queue, Guid organizationId)
         : INotificationHandler<JobCreatedDomainEvent>

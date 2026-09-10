@@ -5,11 +5,6 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace JobTracker.IntegrationTests.Api;
 
-/// <summary>
-/// Builds JWTs directly rather than through the API, because the API will not
-/// issue an invalid one — which is exactly the point of the tests that use
-/// these.
-/// </summary>
 internal static class TestTokens
 {
     public static string Signed(Guid organizationId, string key, TimeSpan? lifetime = null)
@@ -30,7 +25,6 @@ internal static class TestTokens
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    /// <summary>A token this API's key did not sign.</summary>
     public static string Forged(Guid organizationId) =>
         Signed(organizationId, "a-completely-different-key-also-32-bytes-long");
 

@@ -26,8 +26,6 @@ describe('useStartJob', () => {
     const { result } = renderHook(() => useStartJob());
     act(() => result.current.run('job-1', 'Scheduled'));
 
-    // The overlay is written before the await, which is what makes the change
-    // optimistic rather than merely fast.
     expect(useJobsUiStore.getState().optimisticStatus['job-1']).toBe('InProgress');
 
     await act(async () => {

@@ -7,8 +7,6 @@ import { JobDetailView } from '@/presentation/views/job-detail/components/organi
 
 export const dynamic = 'force-dynamic';
 
-// Next 15: params is a Promise and must be awaited. Verified against 15.5.25
-// through next build, which is what validates route signatures — tsc does not.
 export default async function JobDetailPage({
   params,
 }: {
@@ -18,9 +16,6 @@ export default async function JobDetailPage({
   const result = await getJob(getContainer().jobs, id);
 
   if (!isOk(result)) {
-    // Renders app/jobs/not-found.tsx. Without a route that can genuinely 404,
-    // that file is decorative — which is why design A1 put the detail screen
-    // in scope at all.
     notFound();
   }
 

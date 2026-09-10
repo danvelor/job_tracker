@@ -12,13 +12,6 @@ export default function JobsError({
 }) {
   const router = useRouter();
 
-  /**
-   * `reset()` alone re-renders the segment from the payload already in hand,
-   * which for a Server Component failure is the failure itself — measured:
-   * clicking it issued no request and the boundary redisplayed unchanged.
-   * `router.refresh()` is what discards that payload and asks the server
-   * again, so the two together are what "try again" has to mean here.
-   */
   const retry = (): void => {
     router.refresh();
     reset();

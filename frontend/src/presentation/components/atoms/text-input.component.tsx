@@ -12,11 +12,6 @@ export type TextInputProps = {
   readonly onBlur?: () => void;
 };
 
-/**
- * The controlled contract of design A7: `value` in, `onChange` out carrying
- * the value rather than the DOM event, and `error` displayed rather than
- * decided. The component holds nothing.
- */
 export function TextInput({
   testId,
   value,

@@ -24,10 +24,6 @@ type BarContext = FilterJobsApi & { readonly assignees: readonly Party[] };
 
 const Context = createContext<BarContext | null>(null);
 
-/**
- * A child outside the root is a wiring mistake, and returning null would hide
- * it until someone noticed a missing control. Throwing names the mistake.
- */
 function useBar(child: string): BarContext {
   const value = useContext(Context);
   if (value === null) {
@@ -36,13 +32,6 @@ function useBar(child: string): BarContext {
   return value;
 }
 
-/**
- * The compound root owns no state either: it provides a context sourced from
- * useFilterJobs. What the pattern buys here is that the caller controls which
- * filters appear and in what order without the root knowing the set — a
- * narrower screen renders three of the five children and the root does not
- * change (design A6).
- */
 function JobFilterBarRoot({
   assignees,
   children,

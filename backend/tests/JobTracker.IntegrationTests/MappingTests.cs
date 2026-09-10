@@ -24,9 +24,6 @@ public sealed class MappingTests(PostgresFixture postgres) : IntegrationTestBase
 
         var read = await Context.Jobs.SingleAsync();
 
-        // Case 2 of architecture 8.2. Owned-type mapping is EF configuration,
-        // not code a mock can report on, and the value object's structural
-        // equality is what makes one assertion enough.
         read.Address.Should().Be(job.Address);
     }
 
@@ -52,8 +49,6 @@ public sealed class MappingTests(PostgresFixture postgres) : IntegrationTestBase
             .SqlQuery<string>($"""select status as "Value" from jobs.jobs limit 1""")
             .SingleAsync();
 
-        // Case 3. An integer-backed enum reorders the moment someone inserts a
-        // member, and every stored row then means something else.
         status.Should().Be("Scheduled");
     }
 
@@ -90,13 +85,6 @@ public sealed class MappingTests(PostgresFixture postgres) : IntegrationTestBase
     [Fact]
     public void The_domain_events_are_not_a_mapped_navigation()
     {
-        // If EF treated DomainEvents as a navigation it would try to write an
-        // IDomainEvent to a table that has no business existing. The outbox is
-        // what carries an event, and it stores a serialised copy.
-        //
-        // Asserted against the model rather than by saving and checking the
-        // list: the interceptor now clears the events during SaveChanges, so a
-        // behavioural check here would be measuring the interceptor instead.
         Context.Model.FindEntityType(typeof(Job))!
             .FindNavigation(nameof(Job.DomainEvents))
             .Should().BeNull();
@@ -112,8 +100,6 @@ public sealed class MappingTests(PostgresFixture postgres) : IntegrationTestBase
             .SqlQuery<DateTimeOffset>($"""select created_at as "Value" from jobs.jobs limit 1""")
             .SingleAsync();
 
-        // NFR-6: every job carries when it was created, and the default comes
-        // from the database so a row written by anything at all still has one.
         createdAt.Should().NotBe(default);
     }
 }

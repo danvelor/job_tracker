@@ -1,6 +1,7 @@
 /**
  * @jest-environment node
  */
+
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHttpJobsAdapter } from '../http-jobs.adapter';
@@ -29,13 +30,6 @@ const problem = (
   response.end(JSON.stringify({ title: 'Refused', status, detail: 'why', errorCode, ...extra }));
 };
 
-/**
- * A real server on an ephemeral port, not a mocked fetch.
- *
- * A mock would assert on the mock. This asserts on what crossed the wire, and
- * it catches what a mock never produces: a wrong path, a missing header, a body
- * serialised the wrong way, and — in one test below — a refused connection.
- */
 async function serving(route: Route): Promise<{
   origin: string;
   seen: Recorded[];
@@ -67,7 +61,6 @@ async function serving(route: Route): Promise<{
   };
 }
 
-/** Answers the token endpoint, then delegates everything else. */
 const withToken = (route: Route): Route => (request, response) => {
   if (request.url === '/auth/dev-token') {
     json(response, 200, { token: 'a-token' });
@@ -99,8 +92,6 @@ describe('HttpJobsAdapter', () => {
     await adapter.search({ limit: 10 });
     await server.close();
 
-    // Architecture 7.1: the token is attached here, server-side, and never
-    // reaches the browser. Without it the user sees an empty list, not a 401.
     const search = server.seen.find((request) => request.url.startsWith('/api/jobs'));
     expect(search?.authorization).toBe('Bearer a-token');
   });
@@ -115,8 +106,6 @@ describe('HttpJobsAdapter', () => {
     await adapter.search({ limit: 10 });
     await server.close();
 
-    // Otherwise every page load costs an extra round trip and the token
-    // endpoint becomes the hot path.
     expect(server.seen.filter((request) => request.url === '/auth/dev-token')).toHaveLength(1);
   });
 
@@ -129,8 +118,6 @@ describe('HttpJobsAdapter', () => {
     const result = await adapter.search({ limit: 10 });
     await server.close();
 
-    // JobResponse is flat; JobSummary nests. Mapping here is what stops the
-    // wire shape leaking into components.
     expect(result.ok && result.value.items[0].address).toEqual({
       street: '12 Elm St',
       city: 'Springfield',
@@ -162,8 +149,6 @@ describe('HttpJobsAdapter', () => {
     const result = await adapter.search({ limit: 10 });
     await server.close();
 
-    // The same word the in-memory adapter uses, because the two must be
-    // substitutable down to what the user reads.
     expect(result.ok && result.value.items[0].assigneeName).toBe('Unassigned');
   });
 
@@ -199,8 +184,6 @@ describe('HttpJobsAdapter', () => {
     await adapter.search({ limit: 5 });
     await server.close();
 
-    // `?text=` is not the same request as no text at all, and the API would
-    // be within its rights to treat it as a search for the empty string.
     const url = server.seen.find((request) => request.url.startsWith('/api/jobs'))!.url;
     expect(url).not.toContain('text=');
     expect(url).not.toContain('cursor=');
@@ -244,8 +227,6 @@ describe('HttpJobsAdapter', () => {
     expect(body.address).toBeUndefined();
   });
 
-  // ---- the error contract ------------------------------------------------
-
   it('maps a 409 onto a conflict', async () => {
     const server = await serving(withToken((_, response) =>
       problem(response, 409, 'job.terminal'),
@@ -255,8 +236,6 @@ describe('HttpJobsAdapter', () => {
     const result = await adapter.start('an-id');
     await server.close();
 
-    // The agreement that makes the two adapters substitutable: the same
-    // refusal produces the same kind on both sides (jobs.port.ts).
     expect(result.ok).toBe(false);
     expect(!result.ok && result.error.kind).toBe('conflict');
     expect(!result.ok && result.error.code).toBe('job.terminal');
@@ -300,9 +279,6 @@ describe('HttpJobsAdapter', () => {
     const result = await adapter.start('an-id');
     await server.close();
 
-    // A thrown error escapes the Result discipline and lands in an error
-    // boundary, losing the code the user would quote in a report. The body is
-    // not even JSON here, which is what a proxy returns on a bad day.
     expect(!result.ok && result.error.kind).toBe('failure');
   });
 
@@ -314,8 +290,6 @@ describe('HttpJobsAdapter', () => {
     const adapter = createHttpJobsAdapter({ baseUrl: origin });
     const result = await adapter.search({ limit: 10 });
 
-    // The case a mocked fetch never produces and production produces on its
-    // first deploy.
     expect(result.ok).toBe(false);
     expect(!result.ok && result.error.kind).toBe('failure');
   });
@@ -329,8 +303,6 @@ describe('HttpJobsAdapter', () => {
         return;
       }
 
-      // The first token has expired. Anything minted after it is accepted,
-      // which is what the API does once the clock passes `exp`.
       if (request.headers.authorization === 'Bearer token-1') {
         problem(response, 401, 'auth.required');
         return;
@@ -343,9 +315,6 @@ describe('HttpJobsAdapter', () => {
     const result = await adapter.search({ limit: 10 });
     await server.close();
 
-    // The token lives 60 minutes and the Next server outlives it. Caching it
-    // for the life of the process turns the whole page into an error boundary
-    // that no reload recovers from — only a restart.
     expect(result.ok).toBe(true);
     expect(server.seen.filter((request) => request.url === '/auth/dev-token')).toHaveLength(2);
   });
@@ -364,8 +333,6 @@ describe('HttpJobsAdapter', () => {
     const result = await adapter.search({ limit: 10 });
     await server.close();
 
-    // A 401 that is not about expiry — a wrong key, a revoked principal —
-    // must not become an unbounded retry against the token endpoint.
     expect(!result.ok && result.error.kind).toBe('unauthorized');
     expect(server.seen.filter((request) => request.url === '/auth/dev-token')).toHaveLength(2);
     expect(server.seen.filter((request) => request.url.startsWith('/api/jobs'))).toHaveLength(2);
@@ -393,8 +360,6 @@ describe('HttpJobsAdapter', () => {
     const result = await adapter.search({ limit: 10 });
     await server.close();
 
-    // Without this the adapter would send `Bearer undefined` and the user
-    // would see an authorization error for an availability problem.
     expect(!result.ok && result.error.kind).toBe('failure');
   });
 

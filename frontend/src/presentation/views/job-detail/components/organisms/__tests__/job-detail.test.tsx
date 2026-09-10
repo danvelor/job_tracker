@@ -75,10 +75,6 @@ describe('JobDetailView', () => {
   it('summarises the job through the domain state machine', () => {
     render(<JobDetailView job={detail} />);
 
-    // /jobs/[id] holds startedAt, completedAt, the signature and the photos,
-    // so it can build a faithful JobState — which is what makes it the honest
-    // home for getJobSummary. A list row cannot: a summary carries none of
-    // those.
     expect(screen.getByTestId('job-detail-summary')).toHaveTextContent(
       'Completed on 2099-03-09, signed',
     );

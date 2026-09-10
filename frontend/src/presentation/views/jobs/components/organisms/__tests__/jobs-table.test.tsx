@@ -53,9 +53,6 @@ describe('JobsTable', () => {
       <JobsTable jobs={[]} hasActiveFilter onToggleSelect={noop} renderActions={() => null} />,
     );
 
-    // A different message because the remedy is different: telling someone
-    // with active filters that they have "no jobs yet" sends them to create a
-    // duplicate (design A4).
     expect(screen.getByTestId('jobs-empty-no-matches')).toBeInTheDocument();
     expect(screen.queryByTestId('jobs-empty-no-jobs')).not.toBeInTheDocument();
   });

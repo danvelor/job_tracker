@@ -72,9 +72,6 @@ describe('molecules', () => {
       </table>,
     );
 
-    // A summary carries no timestamps, so the row states what it knows rather
-    // than reconstructing a JobState and inventing the rest. getJobSummary
-    // moved to /jobs/[id], which holds the data it needs.
     expect(screen.getByTestId('job-row-job-1')).toHaveAttribute(
       'aria-label',
       'Ridge tile replacement, Scheduled, 2099-03-14, J. Ortiz',

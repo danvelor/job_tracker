@@ -33,13 +33,6 @@ const invalid = (message: string, field: string): CoreError => ({
 const nameOf = (roster: readonly Party[], id: string): string =>
   roster.find((party) => party.id === id)?.name ?? 'Unassigned';
 
-/**
- * Holds a seeded array and reproduces the backend's refusals rather than being
- * a happy-path stub: BR-1 to BR-5 each return the CoreError kind the HTTP
- * adapter maps from ProblemDetails. That behavioural agreement is what makes
- * the two substitutable, and it is what lets the end-to-end suite run with
- * neither backend nor database (D-01).
- */
 export function createInMemoryJobsAdapter(): JobsPort {
   const jobs: SeedJob[] = seedJobs();
   let sequence = 0;
@@ -173,9 +166,6 @@ export function createInMemoryJobsAdapter(): JobsPort {
       const job = find(id);
       if (job === undefined) return err(notFound());
 
-      // Validation precedes the state check: a missing signature is a
-      // validation failure whatever the job's state, and BR-4 is about the
-      // input rather than the transition.
       if (input.signatureUrl.trim() === '') {
         return err(invalid('A customer signature is required', 'signatureUrl'));
       }

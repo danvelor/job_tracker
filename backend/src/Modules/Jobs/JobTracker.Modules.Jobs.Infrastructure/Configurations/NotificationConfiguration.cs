@@ -9,9 +9,6 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
     public void Configure(EntityTypeBuilder<Notification> builder)
     {
         builder.ToTable("notifications", table =>
-            // A notification that claims to have been sent without recording
-            // when is a record that cannot be audited, which defeats the point
-            // of keeping one.
             table.HasCheckConstraint(
                 "ck_notifications_sent_has_timestamp",
                 "status <> 'Sent' OR sent_at IS NOT NULL"));
@@ -28,9 +25,6 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
             .HasConversion<string>().IsRequired().HasMaxLength(20);
         builder.Property(notification => notification.CreatedAt).IsRequired();
 
-        // The whole of this consumer's idempotency (4.5). Two handlers write
-        // into this table for two different recipients, which is why one
-        // constraint serves both.
         builder.HasIndex(
                 notification => new { notification.SourceEventId, notification.Recipient })
             .IsUnique()

@@ -9,9 +9,6 @@ namespace JobTracker.IntegrationTests;
 [Collection(PostgresCollection.Name)]
 public abstract class IntegrationTestBase(PostgresFixture postgres) : IAsyncLifetime
 {
-    // The seed is the source of these, not a literal repeated here. A job
-    // carries foreign keys to both rosters (D-26), so a test that invents an
-    // assignee identifier fails on a constraint rather than on its subject.
     protected static readonly Guid Organization = RosterSeed.DevelopmentOrganization;
     protected static readonly Guid OtherOrganization = RosterSeed.SecondOrganization;
     protected static readonly Guid Assignee = RosterSeed.AssigneeOrtiz;
@@ -21,30 +18,16 @@ public abstract class IntegrationTestBase(PostgresFixture postgres) : IAsyncLife
 
     protected JobsDbContext Context { get; private set; } = null!;
 
-    /// <summary>
-    /// The same object the context reads its tenant from, so a test can hand it
-    /// to the outbox processor exactly as the application does.
-    /// </summary>
     protected MutableTenantContext Tenant { get; } = new(RosterSeed.DevelopmentOrganization);
 
-    /// <summary>
-    /// Builds a context for another organization over the same data. Tenant
-    /// isolation cannot be tested with one context: the filter has to be shown
-    /// <em>not</em> returning rows a second tenant should never see.
-    /// </summary>
     protected JobsDbContext ContextFor(Guid organizationId) =>
         new(BuildOptions(), new MutableTenantContext(organizationId));
 
     private DbContextOptions<JobsDbContext> BuildOptions() =>
         new DbContextOptionsBuilder<JobsDbContext>()
             .UseNpgsql(postgres.ConnectionString, npgsql =>
-                // The same history table JobsModule configures. With two of
-                // them over one database each migrator saw the other's history
-                // as empty and tried to create every table again.
                 npgsql.MigrationsHistoryTable("__EFMigrationsHistory", JobsDbContext.Schema))
             .UseSnakeCaseNamingConvention()
-            // The same registration JobsModule makes. A harness without it
-            // would test a context the application never builds.
             .AddInterceptors(new InsertOutboxMessagesInterceptor())
             .Options;
 
@@ -52,10 +35,6 @@ public abstract class IntegrationTestBase(PostgresFixture postgres) : IAsyncLife
     {
         Context = new JobsDbContext(BuildOptions(), Tenant);
 
-        // A clean schema per test rather than a clean container: the same
-        // isolation for a hundredth of the cost. Dropping and re-migrating also
-        // means every test exercises the migration, which is case 1 of
-        // architecture 8.2 running continuously rather than once.
         await Context.Database.EnsureDeletedAsync();
         await Context.Database.MigrateAsync();
     }

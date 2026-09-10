@@ -4,11 +4,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace JobTracker.IntegrationTests;
 
-/// <summary>
-/// The parts of the schema EF's fluent API cannot express, and which therefore
-/// live in raw SQL inside a migration: the updated_at trigger and the
-/// expression and GIN indexes.
-/// </summary>
 public sealed class SchemaTests(PostgresFixture postgres) : IntegrationTestBase(postgres)
 {
     private static readonly DateTimeOffset Now = new(2026, 3, 1, 9, 0, 0, TimeSpan.Zero);
@@ -48,10 +43,6 @@ public sealed class SchemaTests(PostgresFixture postgres) : IntegrationTestBase(
                 $"""select updated_at as "Value" from jobs.jobs where id = {id}""")
             .SingleAsync();
 
-        // NFR-6 wants updated_at to be true, and a DEFAULT only fires on
-        // INSERT. The update above went through raw SQL on purpose: EF's
-        // SaveChanges is not the only writer this schema has to survive, so the
-        // trigger is what makes the column honest rather than decorative.
         after.Should().BeAfter(before);
     }
 
@@ -60,10 +51,6 @@ public sealed class SchemaTests(PostgresFixture postgres) : IntegrationTestBase(
     {
         var definition = await IndexDefinition("ix_jobs_tenant_keyset");
 
-        // The alignment that actually broke once. EF emitted
-        // COALESCE(scheduled_date, $1) until EF.Constant was applied, and a
-        // bind parameter cannot match an indexed expression — the index existed
-        // and was never used. This asserts the two are the same expression.
         definition.Should().Contain("COALESCE(scheduled_date, '-infinity'::date)");
         definition.Should().Contain("organization_id");
     }
@@ -73,9 +60,6 @@ public sealed class SchemaTests(PostgresFixture postgres) : IntegrationTestBase(
     {
         var definition = await IndexDefinition("ix_jobs_tenant_status_keyset");
 
-        // Column order is the whole value of a composite index: with status
-        // behind the sort keys the equality becomes a post-filter and the index
-        // stops being a scan boundary.
         definition.Should().Contain("organization_id, status");
         definition.Should().Contain("COALESCE(scheduled_date, '-infinity'::date)");
     }
@@ -87,12 +71,6 @@ public sealed class SchemaTests(PostgresFixture postgres) : IntegrationTestBase(
 
         definition.Should().Contain("USING gin");
 
-        // PostgreSQL's own normalisation of the expression, casts included. It
-        // applies the same normalisation to the query, which is why comparing
-        // the stored form is comparing like with like — and why a repository
-        // that concatenated the two columns differently, or asked for a
-        // different regconfig, would show up here rather than as an index that
-        // silently stopped being used.
         definition.Should().Contain(
             "to_tsvector('english'::regconfig, (((title)::text || ' '::text) || COALESCE(description, ''::text)))");
     }
@@ -102,10 +80,6 @@ public sealed class SchemaTests(PostgresFixture postgres) : IntegrationTestBase(
     {
         await SeedJob();
 
-        // An index is only correct if it changes cost and not results. This is
-        // the same assertion SearchTests makes, repeated here because the index
-        // is what this file is about — remove the GIN index and it must still
-        // pass; break the expression it indexes and it must not.
         var rows = await Context.Jobs
             .Where(job => EF.Functions
                 .ToTsVector("english", job.Title + " " + (job.Description ?? string.Empty))
@@ -118,8 +92,6 @@ public sealed class SchemaTests(PostgresFixture postgres) : IntegrationTestBase(
     [Fact]
     public async Task Both_rosters_are_indexed_by_tenant()
     {
-        // Every roster read is filtered by organization and by nothing else,
-        // and the pickers issue one on every page load.
         var assignees = await IndexDefinition("ix_assignees_tenant");
         var customers = await IndexDefinition("ix_customers_tenant");
 

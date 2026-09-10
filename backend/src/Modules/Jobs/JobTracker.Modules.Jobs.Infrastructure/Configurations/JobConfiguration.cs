@@ -10,19 +10,8 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
     {
         builder.ToTable("jobs", table =>
         {
-            // Telling EF the truth about the table. It costs nothing today,
-            // because no column here is store-generated on update and EF
-            // therefore emits no RETURNING clause for the trigger to
-            // invalidate. The day updated_at is mapped as generated — the
-            // natural next step, so EF refreshes it after a save — EF would
-            // start using RETURNING and every update would throw a spurious
-            // concurrency exception. Declaring it now costs a line.
             table.HasTrigger("tr_jobs_touch_updated_at");
 
-            // BR-4 and BR-5 at the level of the data. The aggregate enforces
-            // both, but a row written by anything other than the aggregate — a
-            // migration, a psql session, a future service — must not be able to
-            // contradict them.
             table.HasCheckConstraint(
                 "ck_jobs_completed_has_signature",
                 "status <> 'Completed' OR signature_url IS NOT NULL");
@@ -31,22 +20,11 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
                 "ck_jobs_cancelled_has_reason",
                 "status <> 'Cancelled' OR cancellation_reason IS NOT NULL");
 
-            // Storing the status as text buys readability; without this it
-            // would also buy the freedom to store nonsense, which the ordinal
-            // it replaced at least did not allow.
-            //
-            // Built from the enum rather than from a literal list, so there is
-            // one source of truth. Adding a JobStatus without generating a
-            // migration still fails: the test database carries the constraint
-            // this migration wrote, not the one the enum now describes.
             table.HasCheckConstraint("ck_jobs_status", StatusIsOneOfTheDefinedValues());
         });
 
         builder.HasKey(job => job.Id);
 
-        // The list of domain events is not state; the outbox in plan 4 carries
-        // it. Without this EF sees a collection of an interface and fails to
-        // build the model.
         builder.Ignore(job => job.DomainEvents);
 
         builder.Property(job => job.Title).IsRequired().HasMaxLength(200);
@@ -54,9 +32,6 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.Property(job => job.CancellationReason);
         builder.Property(job => job.SignatureUrl);
 
-        // Text, not an ordinal: readable in a psql session, diff-friendly in a
-        // migration, and safe against the reordering that makes an
-        // integer-backed enum dangerous across deployments.
         builder.Property(job => job.Status)
             .HasConversion<string>()
             .IsRequired()
@@ -65,8 +40,6 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.Property(job => job.OrganizationId).IsRequired();
         builder.Property(job => job.CustomerId).IsRequired();
 
-        // No identity of its own, so no table of its own. Flattened onto the
-        // job row (architecture 6.2).
         builder.OwnsOne(job => job.Address, address =>
         {
             address.Property(value => value.Street).HasColumnName("street").IsRequired();
@@ -85,15 +58,10 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
             .HasForeignKey(photo => photo.JobId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Through the field, not through the property: Photos returns a fresh
-        // read-only wrapper on every call, which EF cannot add to.
         builder.Metadata
             .FindNavigation(nameof(Job.Photos))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 
-        // NFR-6. Shadow properties: when a job was created and last touched is
-        // an audit concern, and no business rule reads either, so neither
-        // belongs on the aggregate.
         builder.Property<DateTimeOffset>("CreatedAt")
             .HasDefaultValueSql("now()")
             .ValueGeneratedOnAdd();
@@ -101,8 +69,6 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.Property<DateTimeOffset>("UpdatedAt")
             .HasDefaultValueSql("now()");
 
-        // D-26. The rosters are read-only, but the reference is real: a job
-        // must not point at an assignee that does not exist.
         builder.HasOne<Assignee>()
             .WithMany()
             .HasForeignKey(job => job.AssigneeId)

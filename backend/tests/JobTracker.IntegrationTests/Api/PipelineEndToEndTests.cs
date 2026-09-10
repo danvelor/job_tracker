@@ -12,13 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace JobTracker.IntegrationTests.Api;
 
-/// <summary>
-/// Walkthrough steps 4 and 9 (architecture 8.1), through the real HTTP
-/// pipeline with every handler resolved by the application's own container.
-/// The browser-level smoke against Compose is plan 5; proving the same two
-/// steps here is what makes that a confirmation rather than a debugging
-/// session.
-/// </summary>
 [Collection(PostgresCollection.Name)]
 public sealed class PipelineEndToEndTests(PostgresFixture postgres) : IAsyncLifetime
 {
@@ -43,16 +36,6 @@ public sealed class PipelineEndToEndTests(PostgresFixture postgres) : IAsyncLife
         await billing.Database.ExecuteSqlRawAsync("truncate billing.invoices");
     }
 
-    /// <summary>
-    /// Drains until there is nothing left, with a bound rather than a sleep.
-    /// NFR-4 promises consequences arrive within seconds, so asserting on a
-    /// bound is asserting on eventual consistency; sleeping a fixed interval
-    /// pretends it is synchronous and fails on a slow machine.
-    ///
-    /// It drains rather than waiting for Hangfire's tick because the test
-    /// should not depend on a clock. HangfireWiringTests covers the fact that
-    /// something eventually calls this in production.
-    /// </summary>
     private async Task DrainUntilQuiet()
     {
         for (var attempt = 0; attempt < 5; attempt++)
@@ -94,12 +77,6 @@ public sealed class PipelineEndToEndTests(PostgresFixture postgres) : IAsyncLife
         ["customerId"] = RosterSeed.CustomerAcme,
     };
 
-    /// <summary>
-    /// Reads outside a request, which means declaring the tenant the way the
-    /// outbox drain does. Without it the query filter has no claim to read and
-    /// the read throws — the same failure the pipeline itself hit, and a fair
-    /// reminder that NFR-1 applies to whoever is asking, tests included.
-    /// </summary>
     private async Task<T> Query<T>(Func<JobsDbContext, Task<T>> read)
     {
         using var scope = _api.Services.CreateScope();
@@ -128,10 +105,6 @@ public sealed class PipelineEndToEndTests(PostgresFixture postgres) : IAsyncLife
 
         await DrainUntilQuiet();
 
-        // Nothing in the interface shows this — design A5 step 6 says creation
-        // does not wait for it — so the assertion reads the database the system
-        // just wrote. That is the normal shape of an integration test, not a
-        // leaked abstraction (architecture 8.1).
         (await Recipients()).Should().Equal("J. Ortiz");
     }
 
@@ -168,8 +141,6 @@ public sealed class PipelineEndToEndTests(PostgresFixture postgres) : IAsyncLife
             photos = Array.Empty<object>(),
         });
 
-        // NFR-4 and design A5 step 6: 204 and no claim. The invoice does not
-        // exist yet, and the interface never said it did.
         completed.StatusCode.Should().Be(HttpStatusCode.NoContent);
         (await Invoices(id)).Should().Be(0);
     }
@@ -188,9 +159,6 @@ public sealed class PipelineEndToEndTests(PostgresFixture postgres) : IAsyncLife
         });
         await DrainUntilQuiet();
 
-        // A crash between a handler succeeding and processed_on being stamped
-        // replays the message (4.3). This is that, and the three consumers'
-        // constraints are what make it harmless.
         using (var scope = _api.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<JobsDbContext>();
@@ -214,12 +182,6 @@ public sealed class PipelineEndToEndTests(PostgresFixture postgres) : IAsyncLife
         await _client.PostAsJsonAsync($"/api/jobs/{id}/cancel", new { reason = "Weather" });
         await DrainUntilQuiet();
 
-        // JobCancelledDomainEvent is the second internal-only event
-        // (architecture 4.4), and the pair of assertions is the whole of it:
-        // cancelling does real work — FR-12 tells the crew twice over, once on
-        // assignment and once on the call-off — and none of that work crosses
-        // into Billing. The absence is what needs the test; a passing customer
-        // notification would be the same failure as an invoice.
         (await Invoices(id)).Should().Be(0);
         (await Recipients()).Should().Equal("J. Ortiz", "J. Ortiz");
         (await Recipients()).Should().NotContain(recipient => recipient.Contains("@"));

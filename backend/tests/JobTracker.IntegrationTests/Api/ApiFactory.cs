@@ -10,12 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace JobTracker.IntegrationTests.Api;
 
-/// <summary>
-/// The real application, over the real database, reached through the real HTTP
-/// pipeline. Nothing is substituted except the connection string and the
-/// environment name — a factory that swapped the authentication handler for a
-/// permissive one would stop testing the thing most worth testing.
-/// </summary>
 public class ApiFactory(string connectionString, string environment = "Development")
     : WebApplicationFactory<Program>
 {
@@ -31,32 +25,12 @@ public class ApiFactory(string connectionString, string environment = "Developme
         builder.UseSetting("Jwt:Issuer", Issuer);
         builder.UseSetting("Jwt:Audience", Audience);
 
-        // The host starts a real Hangfire server, because registering the
-        // recurring job is part of what these tests check. The poll is pushed
-        // to the far end of what a seconds-cron accepts so it never fires
-        // mid-test: a drain running under a test would make every assertion
-        // about outbox rows a race. Tests that want a drain call the processor.
         builder.UseSetting("Outbox:PollSeconds", "59");
 
-        // TestServer has no socket, so Connection.RemoteIpAddress is null,
-        // where real Kestrel always sets one. Supplying loopback restores what
-        // the test host omits rather than relaxing anything: the dashboard
-        // filter refuses null on purpose, and its unit tests cover a genuinely
-        // remote address directly.
         builder.ConfigureServices(services =>
             services.AddSingleton<IStartupFilter, LoopbackConnectionFilter>());
     }
 
-    /// <summary>
-    /// Drops and re-migrates through the application's own DbContext
-    /// registration, so a test starts from a clean schema without knowing how
-    /// the host wired it.
-    /// </summary>
-    /// <summary>
-    /// Truncates rather than dropping and re-migrating. Dropping the database
-    /// would pull it out from under the Hangfire server this host is running,
-    /// and the rosters are seeded by migration so they must survive.
-    /// </summary>
     public async Task ResetSchemaAsync()
     {
         using var scope = Services.CreateScope();

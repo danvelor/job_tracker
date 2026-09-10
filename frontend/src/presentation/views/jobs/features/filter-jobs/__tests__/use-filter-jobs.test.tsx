@@ -67,8 +67,6 @@ describe('useFilterJobs', () => {
     act(() => result.current.setDateRange('2099-03-01', '2099-03-31'));
     act(() => result.current.setDateRange('2099-04-15', '2099-03-31'));
 
-    // An inverted range matches nothing, which reads as a bug rather than as
-    // a filter, so whichever bound moved drags the other with it.
     expect(result.current.filters.scheduledFrom).toBe('2099-04-15');
     expect(result.current.filters.scheduledTo).toBe('2099-04-15');
   });

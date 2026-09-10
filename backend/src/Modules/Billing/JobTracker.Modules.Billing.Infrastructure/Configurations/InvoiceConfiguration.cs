@@ -20,20 +20,11 @@ internal sealed class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(invoice => invoice.CustomerId).IsRequired();
         builder.Property(invoice => invoice.OrganizationId).IsRequired();
 
-        // The business idempotency key line 246 asks for by name. Both parts
-        // are stable across a replay, which is the condition architecture 4.5
-        // puts on one.
         builder.HasIndex(invoice => new { invoice.JobId, invoice.JobCompletedAt })
             .IsUnique()
             .HasDatabaseName("uq_invoices_idempotency");
 
         builder.HasIndex(invoice => new { invoice.OrganizationId, invoice.JobId })
             .HasDatabaseName("ix_invoices_tenant_job");
-
-        // No foreign key to jobs.jobs, and that absence is the module boundary
-        // itself. A constraint there would let the database enforce a
-        // relationship the two modules deliberately express through a contract,
-        // and would turn extracting Billing into its own database from a
-        // migration into a redesign.
     }
 }

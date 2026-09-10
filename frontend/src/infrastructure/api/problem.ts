@@ -1,10 +1,5 @@
 import type { CoreError, CoreErrorKind } from '@/core/domain/result.type';
 
-/**
- * The mirror of the backend's `ResultExtensions`. These two files are the error
- * contract, and they are why `InMemoryJobsAdapter` and `HttpJobsAdapter` are
- * substitutable: the same refusal arrives as the same kind on both sides.
- */
 const KIND_BY_STATUS: Readonly<Record<number, CoreErrorKind>> = {
   400: 'validation',
   401: 'unauthorized',
@@ -23,11 +18,6 @@ type ProblemDocument = {
 const asString = (value: unknown, fallback: string): string =>
   typeof value === 'string' && value !== '' ? value : fallback;
 
-/**
- * `errors` arrives as `{ field: string[] }` and the form wants one message per
- * field. The first is the one to show: FluentValidation orders rules as they
- * were declared, so the first is the most basic thing wrong with the value.
- */
 function toFieldErrors(errors: unknown): Readonly<Record<string, string>> | undefined {
   if (typeof errors !== 'object' || errors === null) {
     return undefined;
@@ -47,8 +37,6 @@ function toFieldErrors(errors: unknown): Readonly<Record<string, string>> | unde
 export async function toCoreError(response: Response): Promise<CoreError> {
   const kind = KIND_BY_STATUS[response.status] ?? 'failure';
 
-  // A proxy answering 502 with an HTML page is a real Tuesday, so parsing is
-  // allowed to fail without turning into an exception of its own.
   const document = await response
     .json()
     .then((body: unknown): ProblemDocument => (typeof body === 'object' && body !== null ? body : {}))
@@ -64,7 +52,6 @@ export async function toCoreError(response: Response): Promise<CoreError> {
   };
 }
 
-/** A request that never reached the server: no status, no document, still a Result. */
 export function toTransportError(cause: unknown): CoreError {
   return {
     code: 'http.unreachable',

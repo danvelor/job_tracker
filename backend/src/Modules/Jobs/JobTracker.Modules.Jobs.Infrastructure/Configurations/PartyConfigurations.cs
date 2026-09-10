@@ -31,8 +31,6 @@ internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         builder.Property(customer => customer.OrganizationId).IsRequired();
         builder.Property(customer => customer.Name).IsRequired().HasMaxLength(200);
 
-        // FR-10 needs somewhere to send the completion notice, so a customer
-        // without one is a customer the notification module cannot serve.
         builder.Property(customer => customer.Email).IsRequired().HasMaxLength(320);
 
         builder.HasData(

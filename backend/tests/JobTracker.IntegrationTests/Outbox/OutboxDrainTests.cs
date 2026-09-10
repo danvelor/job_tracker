@@ -9,29 +9,18 @@ using Microsoft.Extensions.Options;
 
 namespace JobTracker.IntegrationTests.Outbox;
 
-/// <summary>
-/// Hangfire runs the processor; these tests call it directly.
-///
-/// A test that starts a job server and waits for a ten-second tick is slow,
-/// time-dependent, and tests Hangfire. What is worth testing is the drain: the
-/// locking, the ordering, and what a failure leaves behind. One test elsewhere
-/// asserts the recurring job is registered, so the wiring cannot rot into
-/// decoration.
-/// </summary>
 public sealed class OutboxDrainTests(PostgresFixture postgres) : IntegrationTestBase(postgres)
 {
     private static readonly DateTimeOffset Now = new(2026, 3, 1, 9, 0, 0, TimeSpan.Zero);
 
     private readonly RecordingPublisher _publisher = new();
 
-    /// <summary>These tests are about the drain, not about what it queues.</summary>
     private static IBackgroundQueue NoQueue => new NullQueue();
 
     private OutboxProcessor Processor(int batchSize = 20) =>
         new(Context, _publisher, Tenant, NoQueue, TimeProvider.System,
             Options.Create(new OutboxOptions { BatchSize = batchSize }));
 
-    /// <summary>A processor on its own context, so two can hold locks at once.</summary>
     private OutboxProcessor ConcurrentProcessor(RecordingPublisher publisher, int batchSize = 20) =>
         new(ContextFor(Organization), publisher, Tenant, NoQueue, TimeProvider.System,
             Options.Create(new OutboxOptions { BatchSize = batchSize }));
@@ -61,8 +50,6 @@ public sealed class OutboxDrainTests(PostgresFixture postgres) : IntegrationTest
     private Task<string?> AnyError() =>
         Context.Database.SqlQuery<string?>(
             $"""select error as "Value" from jobs.outbox_messages limit 1""").SingleAsync();
-
-    // ---- the happy path --------------------------------------------------
 
     [Fact]
     public async Task Draining_publishes_each_event_and_stamps_the_row()
@@ -107,14 +94,9 @@ public sealed class OutboxDrainTests(PostgresFixture postgres) : IntegrationTest
         (await Unprocessed()).Should().Be(3);
     }
 
-    // ---- what a failure leaves -------------------------------------------
-
     [Fact]
     public async Task A_handler_that_throws_leaves_the_row_unprocessed()
     {
-        // At-least-once (4.3): a row leaves the pipeline only once its
-        // consequence is known to have happened. Stamping a row whose handler
-        // threw is exactly how a message gets lost in silence.
         _publisher.Fail = true;
         await SeedJobs(1);
 
@@ -137,8 +119,6 @@ public sealed class OutboxDrainTests(PostgresFixture postgres) : IntegrationTest
     [Fact]
     public async Task One_poison_message_does_not_stop_the_others()
     {
-        // A drain that stopped at the first failure would stop every unrelated
-        // job in the system from billing or notifying.
         await SeedJobs(3);
         _publisher.FailFirstOnly = true;
 
@@ -161,8 +141,6 @@ public sealed class OutboxDrainTests(PostgresFixture postgres) : IntegrationTest
         (await Unprocessed()).Should().Be(0);
     }
 
-    // ---- replay and concurrency ------------------------------------------
-
     [Fact]
     public async Task A_replayed_message_is_published_again_rather_than_skipped()
     {
@@ -172,24 +150,12 @@ public sealed class OutboxDrainTests(PostgresFixture postgres) : IntegrationTest
 
         await Processor().DrainAsync(default);
 
-        // The pipeline does not deduplicate; the consumers do (4.5). Asserting
-        // it here is what stops someone later "fixing" a duplicate in the wrong
-        // place and quietly turning at-least-once into at-most-once.
         _publisher.Published.Should().HaveCount(2);
     }
 
     [Fact]
     public async Task A_second_drain_cannot_take_rows_the_first_is_holding()
     {
-        // The overlap is forced rather than hoped for. An earlier version of
-        // this test ran two drains with Task.WhenAll and passed with the row
-        // locking removed entirely — the two never actually overlapped, so it
-        // proved nothing. Here the first drain stops inside its first publish,
-        // holding its locks, and the second runs to completion while it waits.
-        //
-        // With FOR UPDATE SKIP LOCKED the second finds nothing and returns.
-        // Without it the second reads the same unprocessed rows and every
-        // consequence happens twice.
         await SeedJobs(5);
 
         var selected = new TaskCompletionSource();
@@ -225,10 +191,6 @@ public sealed class OutboxDrainTests(PostgresFixture postgres) : IntegrationTest
         public bool Fail { get; set; }
         public bool FailFirstOnly { get; set; }
 
-        /// <summary>
-        /// Signals once the drain has selected its batch, then waits. It is
-        /// what turns "two drains ran" into "two drains overlapped".
-        /// </summary>
         public (TaskCompletionSource Selected, TaskCompletionSource Release)? OnFirstPublish { get; set; }
 
         public IReadOnlyList<Common.Domain.IDomainEvent> Published => _published;

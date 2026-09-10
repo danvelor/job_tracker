@@ -22,11 +22,6 @@ export type CreateJobValues = {
   customerId: string;
 };
 
-/**
- * PathKeys types every field address, so 'address.zipCode' is valid and
- * 'address.zip' does not compile. Nested form state is exactly the case
- * dot-notation paths exist for (D-06).
- */
 export type CreateJobField = PathKeys<CreateJobValues>;
 export type CreateJobErrors = Partial<Record<CreateJobField, string>>;
 
@@ -43,11 +38,6 @@ const isBlank = (value: string): boolean => value.trim() === '';
 
 const isNumeric = (value: string): boolean => value !== '' && !Number.isNaN(Number(value));
 
-/**
- * A pure function from values to errors, called by the reducer. Keeping it
- * pure is what makes it testable with no React in the process, and it is the
- * same reason the reducer holds no I/O.
- */
 export function validate(values: CreateJobValues): CreateJobErrors {
   const errors: Record<string, string> = {};
 
@@ -66,8 +56,6 @@ export function validate(values: CreateJobValues): CreateJobErrors {
   if (isBlank(values.scheduledDate)) {
     errors.scheduledDate = 'A scheduled date is required';
   } else if (values.scheduledDate < new Date().toISOString().slice(0, 10)) {
-    // BR-1, checked where the user can be told. The aggregate checks it again
-    // where it cannot be bypassed.
     errors.scheduledDate = 'A job cannot be scheduled in the past';
   }
 
@@ -115,11 +103,6 @@ const setField = (
       }
     : { ...values, [field]: value };
 
-/**
- * useReducer because the form's fields change together and its submission has
- * a lifecycle (assessment line 156). It holds no I/O: the transition is pure,
- * which is what lets the reducer and the validator be tested without React.
- */
 export function createJobReducer(
   state: CreateJobFormState,
   action: CreateJobFormAction,
@@ -187,8 +170,6 @@ export function useCreateJob() {
   const submit = useCallback(() => {
     const errors = validate(form.values);
     if (Object.keys(errors).length > 0) {
-      // Design A5 point 3: submit stays enabled so pressing it reveals every
-      // remaining error at once rather than hiding the way forward.
       dispatch({
         type: 'SUBMIT_FAILED',
         formError: 'Fix the highlighted fields',

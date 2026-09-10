@@ -1,10 +1,6 @@
 import type { JobStatus } from '@/core/domain/job/job-status.type';
 import type { Party } from '@/core/domain/job/job-summary.type';
 
-/**
- * The roster ids match what plan 3 seeds into `jobs.assignees` and
- * `jobs.customers`, so the two adapters agree on what the pickers offer.
- */
 export const SEED_ASSIGNEES: readonly Party[] = [
   { id: 'assignee-1', name: 'J. Ortiz' },
   { id: 'assignee-2', name: 'M. Ruiz' },
@@ -55,14 +51,6 @@ const address = (street: string) => ({
   longitude: -89.65,
 });
 
-/**
- * Scheduled dates sit in 2099 so BR-1 never starts rejecting a seeded job as
- * the real clock advances. A fixture that expires is a test that fails for a
- * reason unrelated to the code.
- *
- * Returns a fresh array each call, so one adapter instance cannot see another's
- * writes.
- */
 export const seedJobs = (): SeedJob[] => [
   {
     id: 'job-1',

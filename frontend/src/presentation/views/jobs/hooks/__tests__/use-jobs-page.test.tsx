@@ -25,18 +25,10 @@ const fetchMock = jest.fn();
 beforeEach(() => {
   useJobsUiStore.getState().reset();
   fetchMock.mockReset();
-  // jsdom exposes no Response global, and the hook only reads `ok` and
-  // `json()` — so the double is the contract rather than a shim of one.
   fetchMock.mockResolvedValue({ ok: true, json: async () => page });
   global.fetch = fetchMock as unknown as typeof fetch;
 });
 
-/**
- * The hook calls use() on the promise, so it suspends until that promise
- * resolves — which is the whole point of D-11. Without a boundary here,
- * renderHook leaves it suspended forever and result.current stays null. The
- * page provides this boundary in production; the test has to as well.
- */
 describe('useJobsPage', () => {
   it('renders the rows the server component resolved', async () => {
     const { result } = renderHook(() => useJobsPage(page, [], []));

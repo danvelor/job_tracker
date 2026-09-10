@@ -5,11 +5,6 @@ using MediatR;
 
 namespace JobTracker.Modules.Jobs.Presentation.Jobs;
 
-/// <summary>
-/// FR-2, correcting a job that is still Scheduled. PATCH rather than POST
-/// because it changes two fields of an existing resource rather than driving a
-/// transition (design B6).
-/// </summary>
 internal sealed class RescheduleJob : IEndpoint
 {
     internal sealed record Request(DateOnly ScheduledDate, Guid AssigneeId);

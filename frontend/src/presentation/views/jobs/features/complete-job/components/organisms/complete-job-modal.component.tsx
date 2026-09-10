@@ -4,7 +4,6 @@ import type { NewPhoto } from '@/core/application/ports/jobs.port';
 import { Button } from '@/presentation/components/atoms/button.component';
 import { SignaturePad } from '@/presentation/components/molecules/signature-pad.component';
 
-/** A thin shell: every value and handler arrives from the slice hook. */
 export function CompleteJobModal({
   signature,
   photos,
@@ -44,10 +43,6 @@ export function CompleteJobModal({
         />
 
         <div className="mt-4">
-          {/* Photo capture is out of scope (prd.md section 9): the crew has no
-              app and no upload path is specified. The button records a
-              reference so the completion carries evidence at all, and the
-              label says what it does rather than implying a camera. */}
           <Button testId="complete-job-photos" variant="secondary" onClick={onAddPhoto}>
             Attach site photo
           </Button>
