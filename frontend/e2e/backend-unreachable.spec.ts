@@ -23,7 +23,11 @@ test.describe('the job list when the backend cannot be reached', () => {
     const jobs = new JobsPage(page);
     await jobs.goto();
 
-    await expect(page.getByRole('alert')).toBeVisible();
+    // Scoped to the boundary, not getByRole('alert'): Next injects
+    // __next-route-announcer__ with that same role after hydration, so a bare
+    // role query resolves to one element or two depending on the timing.
+    await expect(jobs.errorRegion).toBeVisible();
+    await expect(jobs.errorRegion).toHaveAttribute('role', 'alert');
   });
 
   test('retry asks the server again', async ({ page }) => {

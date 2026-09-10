@@ -22,6 +22,13 @@ test.describe('route boundaries', () => {
     await expect(jobs.root).toBeVisible();
   });
 
+  test('the root lands on the job list', async ({ page }) => {
+    await page.goto('/');
+
+    await expect(page).toHaveURL(/\/jobs$/);
+    await expect(page.getByTestId('jobs-page')).toBeVisible();
+  });
+
   test('a real job id renders the job, not the 404', async ({ page }) => {
     const jobs = new JobsPage(page);
 
