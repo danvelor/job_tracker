@@ -75,13 +75,14 @@ describe('useJobsUiStore', () => {
     });
   });
 
-  it('setSort replaces the config', () => {
-    useJobsUiStore.getState().setSort('title', 'asc');
+  it('setSort replaces the ordering field', () => {
+    useJobsUiStore.getState().setSort('title');
 
-    expect(useJobsUiStore.getState().sortConfig).toEqual({
-      field: 'title',
-      direction: 'asc',
-    });
+    expect(useJobsUiStore.getState().sortConfig).toEqual({ field: 'title' });
+  });
+
+  it('holds no sort direction, because the API takes none', () => {
+    expect(useJobsUiStore.getState().sortConfig).not.toHaveProperty('direction');
   });
 
   it('toggles selection on and off', () => {

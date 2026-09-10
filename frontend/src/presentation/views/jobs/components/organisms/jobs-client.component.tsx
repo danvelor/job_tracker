@@ -49,6 +49,8 @@ export function JobsClient({
         <JobsTable
           jobs={page.jobs}
           hasActiveFilter={page.hasActiveFilter}
+          sortField={page.sortField}
+          onSort={page.onSort}
           onToggleSelect={page.onToggleSelect}
           renderActions={(job) => (
             <JobRowActions

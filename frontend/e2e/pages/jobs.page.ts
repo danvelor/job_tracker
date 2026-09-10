@@ -81,6 +81,10 @@ export class JobsPage {
       .waitFor({ state: 'visible' });
   }
 
+  sortBy(field: 'title' | 'scheduledDate'): Locator {
+    return this.page.getByTestId(`jobs-sort-${field}`);
+  }
+
   get loadMore(): Locator {
     return this.page.getByTestId('jobs-load-more');
   }

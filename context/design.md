@@ -252,6 +252,7 @@ identifiers carry the job identifier.
 | `jobs-not-found` | `not-found.tsx`, reached through `notFound()` in `[id]/page.tsx` |
 | `jobs-not-found-back` | The way back to the list from the 404 |
 | `jobs-load-more` | Load more |
+| `jobs-sort-{field}` | The sortable column headers, `title` and `scheduledDate`. The `th` carries `aria-sort`, which is what a screen reader reads |
 | `job-row-{id}` | One row |
 | `job-row-{id}-title` | Title cell |
 | `job-row-{id}-status` | Status badge. The assertion target for state changes |
@@ -683,7 +684,7 @@ type JobsUiState = DeepReadonly<{
     assigneeId: string | null;
   };
   pageSize: number;
-  sortConfig: { field: JobSortField; direction: 'asc' | 'desc' };   // see D-18
+  sortConfig: { field: JobSortField };   // see D-18
   selectedJobIds: string[];
   optimisticStatus: Record<string, JobStatus>;
   rollbackSnapshot: Record<string, JobStatus>;
@@ -713,7 +714,7 @@ draft are contradictory, so every action returns a new object.
 | `setFilter(patch)` | Merges filter fields |
 | `clearFilters()` | Restores defaults |
 | `setPageSize(size)` | How many rows a page asks for |
-| `setSort(field, direction)` | Replaces `sortConfig` |
+| `setSort(field)` | Replaces the ordering field. No direction: the API takes none, and each field has one server order — title ascending, date newest first |
 | `toggleSelection(id)` / `clearSelection()` | Selection |
 | `beginOptimistic(id, target, previous)` | Writes `optimisticStatus[id]` and `rollbackSnapshot[id]` |
 | `commitOptimistic(id)` | Drops both entries; the row reverts to server ownership |

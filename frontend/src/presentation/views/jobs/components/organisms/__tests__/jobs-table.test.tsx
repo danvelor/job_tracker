@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { VisibleJob } from '@/presentation/stores/jobs-ui.store';
 import { JobsErrorBoundary } from '../jobs-error-boundary.component';
 import { JobsTable } from '../jobs-table.component';
@@ -25,6 +26,8 @@ describe('JobsTable', () => {
       <JobsTable
         jobs={[job]}
         hasActiveFilter={false}
+        sortField="scheduledDate"
+        onSort={noop}
         onToggleSelect={noop}
         renderActions={() => null}
       />,
@@ -34,11 +37,84 @@ describe('JobsTable', () => {
     expect(screen.getByTestId('job-row-job-1')).toBeInTheDocument();
   });
 
+  it('offers the sortable columns as buttons', async () => {
+    const onSort = jest.fn();
+    render(
+      <JobsTable
+        jobs={[job]}
+        hasActiveFilter={false}
+        sortField="scheduledDate"
+        onSort={onSort}
+        onToggleSelect={noop}
+        renderActions={() => null}
+      />,
+    );
+
+    await userEvent.click(screen.getByTestId('jobs-sort-title'));
+
+    expect(onSort).toHaveBeenCalledWith('title');
+  });
+
+  it('reports the ordered column to assistive technology', () => {
+    render(
+      <JobsTable
+        jobs={[job]}
+        hasActiveFilter={false}
+        sortField="title"
+        onSort={noop}
+        onToggleSelect={noop}
+        renderActions={() => null}
+      />,
+    );
+
+    expect(screen.getByTestId('jobs-sort-title').closest('th')).toHaveAttribute(
+      'aria-sort',
+      'ascending',
+    );
+    expect(
+      screen.getByTestId('jobs-sort-scheduledDate').closest('th'),
+    ).toHaveAttribute('aria-sort', 'none');
+  });
+
+  it('marks the date column when that is the order in force', () => {
+    render(
+      <JobsTable
+        jobs={[job]}
+        hasActiveFilter={false}
+        sortField="scheduledDate"
+        onSort={noop}
+        onToggleSelect={noop}
+        renderActions={() => null}
+      />,
+    );
+
+    expect(
+      screen.getByTestId('jobs-sort-scheduledDate').closest('th'),
+    ).toHaveAttribute('aria-sort', 'descending');
+  });
+
+  it('leaves a column with no server ordering as plain text', () => {
+    render(
+      <JobsTable
+        jobs={[job]}
+        hasActiveFilter={false}
+        sortField="scheduledDate"
+        onSort={noop}
+        onToggleSelect={noop}
+        renderActions={() => null}
+      />,
+    );
+
+    expect(screen.queryByTestId('jobs-sort-address')).not.toBeInTheDocument();
+  });
+
   it('shows the no-jobs empty state when nothing matches and no filter is active', () => {
     render(
       <JobsTable
         jobs={[]}
         hasActiveFilter={false}
+        sortField="scheduledDate"
+        onSort={noop}
         onToggleSelect={noop}
         renderActions={() => null}
       />,
@@ -50,7 +126,14 @@ describe('JobsTable', () => {
 
   it('shows the no-matches empty state when a filter is active', () => {
     render(
-      <JobsTable jobs={[]} hasActiveFilter onToggleSelect={noop} renderActions={() => null} />,
+      <JobsTable
+        jobs={[]}
+        hasActiveFilter
+        sortField="scheduledDate"
+        onSort={noop}
+        onToggleSelect={noop}
+        renderActions={() => null}
+      />,
     );
 
     expect(screen.getByTestId('jobs-empty-no-matches')).toBeInTheDocument();
@@ -62,6 +145,8 @@ describe('JobsTable', () => {
       <JobsTable
         jobs={[job]}
         hasActiveFilter={false}
+        sortField="scheduledDate"
+        onSort={noop}
         onToggleSelect={noop}
         renderActions={(row) => <button data-testid={`job-row-${row.id}-start`}>Start</button>}
       />,
