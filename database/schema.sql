@@ -1,14 +1,4 @@
--- JobTracker — schema
---
--- EF Core migrations are what actually runs; this file is the same shape in
--- readable form. Both were executed against a clean PostgreSQL 17 and the
--- resulting catalogs are identical, which is why the constraint names are EF's.
-
 CREATE SCHEMA IF NOT EXISTS jobs;
-
--- ---------------------------------------------------------------------------
--- Rosters
--- ---------------------------------------------------------------------------
 
 CREATE TABLE jobs.assignees (
     id              uuid CONSTRAINT pk_assignees PRIMARY KEY,
@@ -22,10 +12,6 @@ CREATE TABLE jobs.customers (
     name            character varying(200) NOT NULL,
     email           character varying(320) NOT NULL
 );
-
--- ---------------------------------------------------------------------------
--- Jobs
--- ---------------------------------------------------------------------------
 
 CREATE TABLE jobs.jobs (
     id                  uuid         CONSTRAINT pk_jobs PRIMARY KEY,
@@ -64,8 +50,6 @@ CREATE TABLE jobs.jobs (
         CHECK (status IN ('Draft', 'Scheduled', 'InProgress', 'Completed', 'Cancelled'))
 );
 
--- A DEFAULT only fires on INSERT, so updated_at is kept true by a trigger
--- rather than by every writer remembering.
 CREATE FUNCTION jobs.touch_updated_at() RETURNS trigger
     LANGUAGE plpgsql AS $$
 BEGIN
@@ -77,10 +61,6 @@ $$;
 CREATE TRIGGER tr_jobs_touch_updated_at
     BEFORE UPDATE ON jobs.jobs
     FOR EACH ROW EXECUTE FUNCTION jobs.touch_updated_at();
-
--- ---------------------------------------------------------------------------
--- Photos
--- ---------------------------------------------------------------------------
 
 CREATE TABLE jobs.job_photos (
     id          uuid        CONSTRAINT pk_job_photos PRIMARY KEY,
