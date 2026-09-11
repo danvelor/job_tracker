@@ -10,10 +10,9 @@
 -- by `dotnet ef database update`. The two are identical. Constraint names below
 -- are EF's, for that reason.
 --
--- Tables belonging to plan 4 — jobs.outbox_messages, jobs.notifications and
--- billing.invoices — are documented in context/design.md B7 and are not
--- repeated here, because a schema file that describes tables the migrations do
--- not yet create is a schema file that lies.
+-- jobs.outbox_messages, jobs.notifications and billing.invoices are created by
+-- their own migrations and are not repeated here, because a schema file that
+-- describes tables the migrations do not yet create is a schema file that lies.
 
 -- One schema per module (architecture 6.1). A module's DbContext maps only its
 -- own schema, so a query that reaches across a module boundary has no DbSet to

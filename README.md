@@ -205,9 +205,5 @@ item 5, 4.2, 4.3, 6.2 and 6.3. They are answered together, briefly, in
 [`docs/answers.md`](docs/answers.md), along with the assumptions the frontend,
 backend and database rest on.
 
-Two of them have a longer treatment of their own:
-[`docs/normalization.md`](docs/normalization.md) for 4.3, and
-[`docs/design-principles.md`](docs/design-principles.md) for part 6.
-
 ---
 
